@@ -1,4 +1,4 @@
-use chat::*;
+use rat::*;
 use tokio::net::TcpStream;
 
 #[tokio::main]

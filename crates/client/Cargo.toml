@@ -1,13 +1,10 @@
 [package]
-name = "rat"
+name = "client"
 version = "0.1.0"
-authors = ["Romain TRUCHI <romain.truchi.06@gmail.com>"]
 edition = "2021"
 
-[workspace]
-members = ["crates/client", "crates/server"]
-
 [dependencies]
+rat = { path = "../../" }
 futures = "0.3"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

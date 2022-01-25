@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use chat::*;
+use rat::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::net::TcpListener;
