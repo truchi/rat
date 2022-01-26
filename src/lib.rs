@@ -1,3 +1,7 @@
+#![allow(unused)]
+
+pub mod ring;
+
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -6,6 +10,50 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
+/// A user.
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
+pub struct User {
+    pub name: String,
+}
+
+/// A room.
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
+pub struct Room {
+    pub name: String,
+}
+
+/// A message.
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub struct Message {
+    pub body: String,
+}
+
+/// An event.
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum Event {
+    Enter {
+        channel: Channel,
+        user:    User,
+    },
+    Leave {
+        channel: Channel,
+        user:    User,
+    },
+    Post {
+        channel: Channel,
+        user:    User,
+        message: Message,
+    },
+}
+
+/// A channel.
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum Channel {
+    World,
+    Room { room: Room },
+    Private { user: User },
+}
+
 pub async fn stdin() -> String {
     use tokio::io::stdin;
     let mut buffer = [0; CAP];
@@ -13,7 +61,7 @@ pub async fn stdin() -> String {
     String::from_utf8_lossy(&buffer[..n]).into_owned()
 }
 
-pub const CAP: usize = 1024;
+pub const CAP: usize = 8 * 1024;
 
 #[async_trait]
 pub trait StreamExt {
@@ -39,15 +87,15 @@ impl StreamExt for TcpStream {
 pub use ClientRequest::*;
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ClientRequest {
-    Connect(String),
-    Send(String),
-    Disconnect,
+    ConnectUser(User),
+    DisconnectUser(User),
+    Event(Event),
 }
 
 pub use ServerResponse::*;
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ServerResponse {
-    Connected(String),
-    Received(String, String),
-    Disconnected,
+    ConnectedUser(User),
+    DisconnectedUser(User),
+    Evented(Event),
 }

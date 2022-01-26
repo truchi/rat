@@ -1,5 +1,13 @@
 #![allow(unused)]
 
+mod client;
+mod manager;
+mod world;
+
+use client::*;
+use manager::*;
+use world::*;
+
 use rat::*;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -8,11 +16,52 @@ use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
+use uuid::Uuid;
 
-type ClientId = u64;
-type FromManager = mpsc::Receiver<ManagerToClient>;
-type FromClient = mpsc::Receiver<ClientToManager>;
+pub type FromManager = mpsc::Receiver<ManagerToClient>;
+pub type FromClient = mpsc::Receiver<ClientToManager>;
+pub type ToClient = mpsc::Sender<ManagerToClient>;
+pub type ToManager = mpsc::Sender<ClientToManager>;
 
+pub use ManagerToClient::*;
+#[derive(Debug)]
+pub enum ManagerToClient {
+    Accepted(Uuid),
+    Response(ServerResponse),
+}
+
+pub use ClientToManager::*;
+#[derive(Debug)]
+pub enum ClientToManager {
+    Accept(ToClient),
+    Request(Uuid, ClientRequest),
+}
+
+#[tokio::main]
+async fn main() {
+    let addr = "127.0.0.1:34254";
+    let listener = TcpListener::bind(addr).await.unwrap();
+    println!("Server started on {addr}");
+
+    let (to_manager, from_client) = mpsc::channel(32);
+
+    let manager = tokio::spawn(async move {
+        Manager::new(from_client).run().await;
+    });
+
+    loop {
+        let (stream, _) = listener.accept().await.unwrap();
+        let to_manager = to_manager.clone();
+
+        tokio::spawn(async move {
+            if let Ok(mut client) = Client::new(stream, to_manager).await {
+                client.run().await;
+            }
+        });
+    }
+}
+
+/*
 #[derive(Debug)]
 struct Client {
     pub name:      Option<String>,
@@ -110,18 +159,6 @@ impl From<mpsc::Sender<ClientToManager>> for ToManager {
     }
 }
 
-#[derive(Debug)]
-enum ManagerToClient {
-    Inited(ClientId),
-    Response(ServerResponse),
-}
-
-#[derive(Debug)]
-enum ClientToManager {
-    Init(ToClient),
-    Request(ClientId, ClientRequest),
-}
-
 struct ManagerTask {
     from_client: FromClient,
     clients:     Clients,
@@ -153,80 +190,4 @@ impl ManagerTask {
         }
     }
 }
-
-struct ClientTask {
-    id:           ClientId,
-    stream:       TcpStream,
-    to_manager:   ToManager,
-    from_manager: FromManager,
-}
-
-impl ClientTask {
-    pub async fn new(stream: TcpStream, to_manager: impl Into<ToManager>) -> Self {
-        let mut to_manager = to_manager.into();
-        let (to_client, mut from_manager) = mpsc::channel(32);
-
-        to_manager.init(to_client).await;
-
-        let id = if let ManagerToClient::Inited(id) = from_manager.recv().await.unwrap() {
-            id
-        } else {
-            unreachable!();
-        };
-
-        Self {
-            id,
-            stream,
-            to_manager,
-            from_manager,
-        }
-    }
-
-    pub async fn run(&mut self) {
-        loop {
-            select! {
-                request = self.stream.recv() => {
-                    self.handle_client_request(request).await;
-                }
-                Some(message) = self.from_manager.recv() => {
-                    self.handle_manager_message(message).await;
-                }
-                else => break,
-            }
-        }
-    }
-
-    async fn handle_client_request(&mut self, request: ClientRequest) {
-        self.to_manager.request(self.id, request).await;
-    }
-
-    async fn handle_manager_message(&mut self, message: ManagerToClient) {
-        if let ManagerToClient::Response(response) = message {
-            self.stream.send(&response).await;
-        } else {
-            unreachable!();
-        }
-    }
-}
-
-#[tokio::main]
-async fn main() {
-    let addr = "127.0.0.1:34254";
-    let listener = TcpListener::bind(addr).await.unwrap();
-    println!("Server started on {addr}");
-
-    let (to_manager, from_client) = mpsc::channel(32);
-
-    let manager = tokio::spawn(async move {
-        ManagerTask::new(from_client).run().await;
-    });
-
-    loop {
-        let (stream, _) = listener.accept().await.unwrap();
-        let to_manager = to_manager.clone();
-
-        tokio::spawn(async move {
-            ClientTask::new(stream, to_manager).await.run().await;
-        });
-    }
-}
+*/

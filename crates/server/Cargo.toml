@@ -5,8 +5,12 @@ edition = "2021"
 
 [dependencies]
 rat = { path = "../../" }
+
 futures = "0.3"
 tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+
 serde = { version = "1", features = ["derive"] }
 ron = "0.7"
-async-trait = "0.1"
+
+uuid = { version = "0.8", features = ["v4"] }
