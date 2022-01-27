@@ -1,23 +1,25 @@
 use super::*;
 
-pub struct Client {
-    id:           Uuid,
-    stream:       TcpStream,
-    to_manager:   ToManager,
-    from_manager: FromManager,
+/// A task interfacing between a [`Client`](db::Client)
+/// and the [`ServerTask`].
+pub struct ClientTask {
+    id:          ClientId,
+    stream:      TcpStream,
+    to_server:   ToServer,
+    from_server: FromServer,
 }
 
-impl Client {
-    pub async fn new(stream: TcpStream, to_manager: ToManager) -> Result<Self, TcpStream> {
-        let (to_client, mut from_manager) = mpsc::channel(32);
+impl ClientTask {
+    pub async fn new(stream: TcpStream, to_server: ToServer) -> Result<Self, TcpStream> {
+        let (to_client, mut from_server) = mpsc::channel(32);
 
-        if to_manager.send(Accept(to_client)).await.is_ok() {
-            if let Some(Accepted(id)) = from_manager.recv().await {
+        if to_server.send(Accept(to_client)).await.is_ok() {
+            if let Some(Accepted(id)) = from_server.recv().await {
                 return Ok(Self {
                     id,
                     stream,
-                    to_manager,
-                    from_manager,
+                    to_server,
+                    from_server,
                 });
             }
         }
@@ -28,7 +30,7 @@ impl Client {
     pub async fn run(&mut self) {
         loop {
             let request = self.stream.recv();
-            let response = self.from_manager.recv();
+            let response = self.from_server.recv();
 
             select! {
                 request = request => self.handle_request(request).await,
@@ -39,10 +41,10 @@ impl Client {
     }
 
     async fn handle_request(&mut self, request: ClientRequest) {
-        self.to_manager
+        self.to_server
             .send(Request(self.id, request))
             .await
-            .expect("to_manager closed");
+            .expect("to_server closed");
     }
 
     async fn handle_response(&mut self, response: ServerResponse) {

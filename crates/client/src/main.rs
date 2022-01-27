@@ -3,7 +3,12 @@
 mod db;
 mod ui;
 
-use rat::*;
+use rat::prelude::*;
+use rat::stdin;
+use rat::Channel;
+use rat::Message;
+use rat::Room;
+use rat::User;
 use tokio::net::TcpStream;
 
 #[tokio::main]
@@ -20,14 +25,13 @@ async fn main() {
     println!("Connected to server {}", addr);
 
     let name = std::env::args().skip(1).next().unwrap_or("anon".into());
-    let user = User { name };
 
-    stream.send(&ConnectUser(user.clone())).await;
+    stream.send(&ConnectUser { name }).await;
 
-    match stream.recv().await {
-        ConnectedUser(u) => debug_assert!(u == user),
-        _ => unreachable!("Server did not connect user {:?}", user),
-    }
+    let user = match stream.recv().await {
+        ConnectedUser(user) => user,
+        _ => unreachable!(),
+    };
 
     println!("You are connected, {}!", user.name);
 

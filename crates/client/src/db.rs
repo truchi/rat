@@ -2,7 +2,7 @@ use super::*;
 use std::collections::HashMap;
 
 /// Alias of `Ring<ChannelEvent>`.
-pub type Events = ring::Ring<ChannelEvent>;
+pub type Events = rat::ring::Ring<ChannelEvent>;
 
 /// Alias of `HashMap<Room, Events>`.
 pub type Rooms = HashMap<Room, Events>;

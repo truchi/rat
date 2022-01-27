@@ -2,6 +2,18 @@
 
 pub mod ring;
 
+pub mod prelude {
+    pub use super::ClientId;
+    pub use super::ClientRequest;
+    pub use super::ClientRequest::*;
+    pub use super::Event;
+    pub use super::RoomId;
+    pub use super::ServerResponse;
+    pub use super::ServerResponse::*;
+    pub use super::StreamExt;
+    pub use super::UserId;
+}
+
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -9,16 +21,52 @@ use serde::Serialize;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+use uuid::Uuid;
+
+macro_rules! ids {
+    ($($(#[$doc:meta])* $Id:ident)*) => { $(
+        $(#[$doc])*
+        #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
+        pub struct $Id(Uuid);
+
+        impl $Id {
+            #[doc = concat!("Creates a new `", stringify!($Id), "`.")]
+            pub fn new() -> Self {
+                Self(Uuid::new_v4())
+            }
+        }
+    )* };
+}
+
+/// Capacity for buffers.
+pub const CAP: usize = 8 * 1024;
+
+ids!(
+    /// A [`Client`] id.
+    ClientId
+    /// A [`User`] id.
+    UserId
+    /// A [`Room`] id.
+    RoomId
+);
+
+/// A client.
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
+pub struct Client {
+    pub id: ClientId,
+}
 
 /// A user.
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct User {
+    pub id:   UserId,
     pub name: String,
 }
 
 /// A room.
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct Room {
+    pub id:   RoomId,
     pub name: String,
 }
 
@@ -54,15 +102,8 @@ pub enum Channel {
     Private { user: User },
 }
 
-pub async fn stdin() -> String {
-    use tokio::io::stdin;
-    let mut buffer = [0; CAP];
-    let n = stdin().read(&mut buffer).await.unwrap();
-    String::from_utf8_lossy(&buffer[..n]).into_owned()
-}
-
-pub const CAP: usize = 8 * 1024;
-
+/// Serde [`send`](StreamExt::send) and [`recv`](StreamExt::recv)
+/// extensions for `TcpStream`s.
 #[async_trait]
 pub trait StreamExt {
     async fn send<T: Sync + Serialize>(&mut self, value: &T);
@@ -84,18 +125,25 @@ impl StreamExt for TcpStream {
     }
 }
 
-pub use ClientRequest::*;
+/// A [`Client`] request to the server.
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ClientRequest {
-    ConnectUser(User),
-    DisconnectUser(User),
+    ConnectUser { name: String },
+    DisconnectUser(UserId),
     Event(Event),
 }
 
-pub use ServerResponse::*;
+/// A server response to the [`Client`].
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ServerResponse {
     ConnectedUser(User),
-    DisconnectedUser(User),
+    DisconnectedUser(UserId),
     Evented(Event),
+}
+
+pub async fn stdin() -> String {
+    use tokio::io::stdin;
+    let mut buffer = [0; CAP];
+    let n = stdin().read(&mut buffer).await.unwrap();
+    String::from_utf8_lossy(&buffer[..n]).into_owned()
 }

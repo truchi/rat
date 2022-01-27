@@ -1,16 +1,17 @@
 use super::*;
 
+/// Handles [`ClientTask`]s.
 #[derive(Debug)]
-pub struct Manager {
+pub struct ServerTask {
     from_client: FromClient,
-    world:       World,
+    db:          Db,
 }
 
-impl Manager {
+impl ServerTask {
     pub fn new(from_client: FromClient) -> Self {
         Self {
             from_client,
-            world: World::new(),
+            db: Db::new(),
         }
     }
 
@@ -18,26 +19,27 @@ impl Manager {
         while let Some(message) = self.from_client.recv().await {
             match message {
                 Accept(to_client) => self.handle_accept(to_client).await,
-                Request(id, ConnectUser(user)) => self.handle_connect_user(id, user).await,
+                Request(id, ConnectUser { name }) => self.handle_connect_user(id, name).await,
                 _ => {}
             }
         }
     }
 
     async fn handle_accept(&mut self, to_client: ToClient) {
-        let client = ClientData::new(to_client);
+        let client = Client::new(to_client);
         let id = client.id;
 
-        let _ = self.world.insert((id, client));
-        self.world
+        let _ = self.db.insert((id, client));
+        self.db
             .get_mut(&id)
             .expect("just inserted id")
             .accepted(id)
             .await
-            .expect("to_client closed"); // TODO remove client from world
+            .expect("to_client closed"); // TODO remove client from db
     }
 
-    async fn handle_connect_user(&mut self, id: Uuid, user: User) {
+    async fn handle_connect_user(&mut self, id: ClientId, name: String) {
+        /*
         self.world.get_mut(&id).expect("Cannot find client").user = Some(user.clone());
         let _ = self
             .world
@@ -51,7 +53,8 @@ impl Manager {
             .expect("to_client closed");
 
         // TODO broacast world Enter(World, user)
+        */
     }
 
-    async fn broacast<T: Iterator<Item = Uuid>>(&mut self, clients: T, event: Event) {}
+    async fn broacast<T: Iterator<Item = ClientId>>(&mut self, clients: T, event: Event) {}
 }
