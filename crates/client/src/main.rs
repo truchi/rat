@@ -1,11 +1,10 @@
 #![allow(unused)]
 
-mod db;
+// mod db;
 mod ui;
 
 use rat::prelude::*;
 use rat::stdin;
-use rat::Channel;
 use rat::Message;
 use rat::Room;
 use rat::User;
@@ -35,20 +34,10 @@ async fn main() {
 
     println!("You are connected, {}!", user.name);
 
-    /*
-    let message = prompt().await;
-    dbg!(&message);
-    stream.send(&Send(message)).await;
-
-    match stream.recv().await {
-        Received(author, message) => {
-            dbg!(&(author, message));
-        }
-        _ => unreachable!(),
+    loop {
+        let recv = stream.recv::<ServerResponse>().await;
+        dbg!(&recv);
     }
-
-    stream.send(&Disconnect).await;
-    */
 }
 
 async fn prompt() -> String {

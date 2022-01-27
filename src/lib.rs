@@ -1,12 +1,16 @@
 #![allow(unused)]
 
+mod event;
 pub mod ring;
 
 pub mod prelude {
+    pub use super::Channel;
     pub use super::ClientId;
     pub use super::ClientRequest;
     pub use super::ClientRequest::*;
     pub use super::Event;
+    pub use super::EventType;
+    pub use super::EventType::*;
     pub use super::RoomId;
     pub use super::ServerResponse;
     pub use super::ServerResponse::*;
@@ -39,7 +43,7 @@ macro_rules! ids {
 }
 
 /// Capacity for buffers.
-pub const CAP: usize = 8 * 1024;
+pub const CAP: usize = 10 * 1024;
 
 ids!(
     /// A [`Client`] id.
@@ -78,28 +82,36 @@ pub struct Message {
 
 /// An event.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum Event {
-    Enter {
-        channel: Channel,
-        user:    User,
-    },
-    Leave {
-        channel: Channel,
-        user:    User,
-    },
-    Post {
-        channel: Channel,
-        user:    User,
-        message: Message,
-    },
+pub struct Event {
+    pub channel:    Channel,
+    pub user_id:    UserId,
+    pub event_type: EventType,
+}
+
+impl Event {
+    pub fn new(channel: Channel, user_id: UserId, event_type: EventType) -> Self {
+        Self {
+            channel,
+            user_id,
+            event_type,
+        }
+    }
+}
+
+/// An [`Event`] type.
+#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+pub enum EventType {
+    Enter,
+    Leave,
+    Post { message: Message },
 }
 
 /// A channel.
-#[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub enum Channel {
     World,
-    Room { room: Room },
-    Private { user: User },
+    Room { room_id: RoomId },
+    Private { user_id: UserId },
 }
 
 /// Serde [`send`](StreamExt::send) and [`recv`](StreamExt::recv)
@@ -129,7 +141,7 @@ impl StreamExt for TcpStream {
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ClientRequest {
     ConnectUser { name: String },
-    DisconnectUser(UserId),
+    DisconnectUser,
     Event(Event),
 }
 
@@ -137,7 +149,7 @@ pub enum ClientRequest {
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ServerResponse {
     ConnectedUser(User),
-    DisconnectedUser(UserId),
+    DisconnectedUser,
     Evented(Event),
 }
 

@@ -1,7 +1,7 @@
 use super::*;
 
 /// A client.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Client {
     pub id:        ClientId,
     pub user_id:   Option<UserId>,
@@ -17,19 +17,23 @@ impl Client {
         }
     }
 
-    pub async fn send(&mut self, message: ServerToClient) -> Result<(), ()> {
+    pub fn set_user(&mut self, user_id: UserId) {
+        self.user_id = Some(user_id);
+    }
+
+    pub async fn send(&self, message: ServerToClient) -> Result<(), ()> {
         self.to_client.send(message).await.map_err(|_| ())
     }
 
-    pub async fn accepted(&mut self, client_id: ClientId) -> Result<(), ()> {
+    pub async fn accepted(&self, client_id: ClientId) -> Result<(), ()> {
         self.send(Accepted(client_id)).await
     }
 
-    pub async fn respond(&mut self, response: ServerResponse) -> Result<(), ()> {
+    pub async fn respond(&self, response: ServerResponse) -> Result<(), ()> {
         self.send(Response(response)).await
     }
 
-    pub async fn event(&mut self, event: Event) -> Result<(), ()> {
+    pub async fn event(&self, event: Event) -> Result<(), ()> {
         self.respond(Evented(event)).await
     }
 }

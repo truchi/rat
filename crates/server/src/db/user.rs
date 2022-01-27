@@ -1,7 +1,7 @@
 use super::*;
 
 /// A user.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct User {
     pub id:          UserId,
     pub client_id:   ClientId,

@@ -1,4 +1,6 @@
 use super::*;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 
 /// Handles [`ClientTask`]s.
 #[derive(Debug)]
@@ -27,34 +29,45 @@ impl ServerTask {
 
     async fn handle_accept(&mut self, to_client: ToClient) {
         let client = Client::new(to_client);
-        let id = client.id;
+        let client_id = client.id;
 
-        let _ = self.db.insert((id, client));
+        let _ = self.db.insert((client_id, client));
         self.db
-            .get_mut(&id)
+            .get_mut(&client_id)
             .expect("just inserted id")
-            .accepted(id)
+            .accepted(client_id)
             .await
             .expect("to_client closed"); // TODO remove client from db
     }
 
-    async fn handle_connect_user(&mut self, id: ClientId, name: String) {
-        /*
-        self.world.get_mut(&id).expect("Cannot find client").user = Some(user.clone());
-        let _ = self
-            .world
-            .insert((user.clone(), UserData::new(id, user.name.clone())));
+    async fn handle_connect_user(&mut self, client_id: ClientId, name: String) {
+        // TODO unique name!
+        let user = User::new(client_id, name);
+        let user_id = user.id;
+        let user_name = user.name.clone();
 
-        self.world
-            .get_mut(&id)
-            .expect("Cannot find client")
-            .respond(ConnectedUser(user))
+        let _ = self.db.insert((user_id, user));
+        let client = self.db.get_mut(&client_id).expect("Cannot find client");
+
+        client.set_user(user_id);
+        client
+            .respond(ConnectedUser(rat::User {
+                id:   user_id,
+                name: user_name,
+            }))
             .await
             .expect("to_client closed");
 
-        // TODO broacast world Enter(World, user)
-        */
+        self.broacast(user_id.enter_world()).await;
     }
 
-    async fn broacast<T: Iterator<Item = ClientId>>(&mut self, clients: T, event: Event) {}
+    async fn broacast(&mut self, event: Event) {
+        let mut events = self
+            .db
+            .channel(&event)
+            .map(|client| client.event(event.clone()))
+            .collect::<FuturesUnordered<_>>();
+
+        while events.next().await.is_some() {}
+    }
 }
