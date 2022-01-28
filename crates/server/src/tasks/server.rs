@@ -49,9 +49,7 @@ impl ServerTask {
         let client_id = client.id;
 
         let _ = self.db.insert((client_id, client));
-        self.db
-            .get_mut(&client_id)
-            .expect("just inserted id")
+        self.db[client_id]
             .accepted(client_id)
             .await
             .expect("to_client closed"); // TODO remove client from db
@@ -65,11 +63,7 @@ impl ServerTask {
             .find(|user| user.name == name)
             .map(|user| user.clone().into());
 
-        self.db
-            .get(&client_id)
-            .expect("Cannot find client")
-            .respond(Response::User(user))
-            .await;
+        self.db[client_id].respond(Response::User(user)).await;
     }
 
     async fn handle_get_room(&mut self, client_id: ClientId, name: String) {
@@ -80,11 +74,7 @@ impl ServerTask {
             .find(|room| room.name == name)
             .map(|room| room.clone().into());
 
-        self.db
-            .get(&client_id)
-            .expect("Cannot find client")
-            .respond(Response::Room(room))
-            .await;
+        self.db[client_id].respond(Response::Room(room)).await;
     }
 
     async fn handle_connect(&mut self, client_id: ClientId, name: String) {
@@ -94,7 +84,7 @@ impl ServerTask {
         let user_name = user.name.clone();
 
         let _ = self.db.insert((user_id, user));
-        let client = self.db.get_mut(&client_id).expect("Cannot find client");
+        let client = &mut self.db[client_id];
 
         client.set_user(user_id);
         client

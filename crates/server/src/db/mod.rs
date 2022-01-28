@@ -10,6 +10,9 @@ pub use client::*;
 pub use room::*;
 pub use user::*;
 
+use std::ops::Index;
+use std::ops::IndexMut;
+
 #[doc(hidden)]
 macro_rules! hashmap_aliases {
     ($($Type:ident = <$K:ident, $V:ident>)*) => { $(
@@ -70,8 +73,7 @@ impl Db {
     }
 
     pub fn room(&self, room_id: RoomId) -> impl Iterator<Item = &Client> {
-        self.get(&room_id)
-            .expect("Room not found")
+        self[room_id]
             .user_ids()
             .map(|&user_id| self.client(user_id))
     }
@@ -79,8 +81,9 @@ impl Db {
 
 impl Db {
     fn client(&self, user_id: UserId) -> &Client {
-        self.get(&self.get(&user_id).expect("User not found").client_id)
-            .expect("Client not found")
+        let client_id = self[user_id].client_id;
+
+        &self[client_id]
     }
 }
 
@@ -134,6 +137,20 @@ macro_rules! impls {
 
             fn iter(db: &Db) -> std::collections::hash_map::Iter<Self::K, Self> {
                 (&db.$field).into_iter()
+            }
+        }
+
+        impl Index<$K> for Db {
+            type Output = $V;
+
+            fn index(&self, index: $K) -> &Self::Output {
+                self.get(&index).unwrap_or_else(|| panic!("{} {:?} not found", stringify!($Type), index))
+            }
+        }
+
+        impl IndexMut<$K> for Db {
+            fn index_mut(&mut self, index: $K) -> &mut Self::Output {
+                self.get_mut(&index).unwrap_or_else(|| panic!("{} {:?} not found", stringify!($Type), index))
             }
         }
     )* };
