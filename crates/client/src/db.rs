@@ -7,9 +7,6 @@ pub type Events = rat::ring::Ring<ChannelEvent>;
 /// Alias of `HashMap<Room, Events>`.
 pub type Rooms = HashMap<Room, Events>;
 
-/// Alias of `HashMap<User, Events>`.
-pub type Privates = HashMap<User, Events>;
-
 /// A channel event.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum ChannelEvent {
@@ -44,10 +41,9 @@ impl ChannelEvent {
 
 #[derive(Clone, Debug)]
 pub struct Db {
-    user:     User,
-    world:    Events,
-    rooms:    Rooms,
-    privates: Privates,
+    user:  User,
+    world: Events,
+    rooms: Rooms,
 }
 
 impl Db {
@@ -56,7 +52,6 @@ impl Db {
             user,
             world: Default::default(),
             rooms: Default::default(),
-            privates: Default::default(),
         }
     }
 
@@ -76,15 +71,10 @@ impl Db {
         &self.rooms
     }
 
-    pub fn privates(&self) -> &Privates {
-        &self.privates
-    }
-
     pub fn push(&mut self, event: Event) {
         match ChannelEvent::from(event) {
             (Channel::World, event) => self.push_world(event),
             (Channel::Room { room }, event) => self.push_room(room, event),
-            (Channel::Private { user }, event) => self.push_private(user, event),
         }
     }
 
@@ -101,14 +91,6 @@ impl Db {
             self.rooms.remove(&room);
         } else {
             self.rooms.entry(room).or_default().push(event);
-        }
-    }
-
-    fn push_private(&mut self, user: User, event: ChannelEvent) {
-        if event.is_leaving(&self.user) {
-            self.privates.remove(&user);
-        } else {
-            self.privates.entry(user).or_default().push(event);
         }
     }
 }

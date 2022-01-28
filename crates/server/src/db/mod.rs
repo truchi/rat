@@ -61,7 +61,6 @@ impl Db {
         match event.channel {
             Channel::World => Box::new(self.world()) as Box<dyn Iterator<Item = _>>,
             Channel::Room { room_id } => Box::new(self.room(room_id)),
-            Channel::Private { user_id } => Box::new(self.private([user_id, event.user_id])),
         }
     }
 
@@ -75,10 +74,6 @@ impl Db {
             .expect("Room not found")
             .user_ids()
             .map(|&user_id| self.client(user_id))
-    }
-
-    pub fn private(&self, user_ids: [UserId; 2]) -> impl Iterator<Item = &Client> {
-        user_ids.into_iter().map(|user_id| self.client(user_id))
     }
 }
 

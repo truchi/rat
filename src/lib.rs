@@ -108,7 +108,6 @@ pub enum EventType {
 pub enum Channel {
     World,
     Room { room_id: RoomId },
-    Private { user_id: UserId },
 }
 
 /// Serde [`send`](StreamExt::send) and [`recv`](StreamExt::recv)
@@ -142,7 +141,6 @@ pub enum Request {
     Connect(String),
     Disconnect,
     Room(UserId, RoomId, EventType),
-    Private(UserId, UserId, EventType),
 }
 
 /// A server response to the [`Client`].

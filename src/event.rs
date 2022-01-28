@@ -36,16 +36,4 @@ impl UserId {
     pub fn post_room(self, room_id: RoomId, message: Message) -> Event {
         self.post(Channel::Room { room_id }, message)
     }
-
-    pub fn enter_private(self, user_id: UserId) -> Event {
-        self.enter(Channel::Private { user_id })
-    }
-
-    pub fn leave_private(self, user_id: UserId) -> Event {
-        self.leave(Channel::Private { user_id })
-    }
-
-    pub fn post_private(self, user_id: UserId, message: Message) -> Event {
-        self.post(Channel::Private { user_id }, message)
-    }
 }

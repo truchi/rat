@@ -92,7 +92,6 @@ impl ServerTask {
                     EventType::Post { .. } => {}
                 }
             }
-            Channel::Private { user_id } => {}
         }
 
         self.broadcast(event).await
