@@ -9,6 +9,14 @@ pub struct Room {
 }
 
 impl Room {
+    pub fn new(name: String) -> Self {
+        Self {
+            id: RoomId::new(),
+            name,
+            user_ids: Vec::new(),
+        }
+    }
+
     pub fn user_ids(&self) -> std::slice::Iter<UserId> {
         self.user_ids.iter()
     }

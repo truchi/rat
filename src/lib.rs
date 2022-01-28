@@ -139,8 +139,9 @@ pub enum Request {
     GetUser(String),
     GetRoom(String),
     Connect(String),
-    Disconnect,
+    CreateRoom(String),
     Event(Event),
+    Disconnect,
 }
 
 /// A server response to the [`Client`].
@@ -150,8 +151,9 @@ pub enum Response {
     User(Option<User>),
     Room(Option<Room>),
     Connected(User),
-    Disconnected,
+    CreatedRoom(Room),
     Event(Event),
+    Disconnected,
     Error,
 }
 

@@ -27,6 +27,8 @@ impl ServerTask {
                     self.handle_get_room(client_id, name).await,
                 C2S::Request(client_id, Request::Connect(name)) =>
                     self.handle_connect(client_id, name).await,
+                C2S::Request(client_id, Request::CreateRoom(name)) =>
+                    self.handle_create_room(client_id, name).await,
                 C2S::Request(client_id, Request::Event(event)) =>
                     self.handle_event(client_id, event).await,
                 _ => {}
@@ -58,9 +60,7 @@ impl ServerTask {
     async fn handle_get_user(&mut self, client_id: ClientId, name: String) {
         let user = self
             .db
-            .iter::<User>()
-            .map(|(_, user)| user)
-            .find(|user| user.name == name)
+            .find::<User, _>(|user| user.name == name)
             .map(|user| user.clone().into());
 
         self.db[client_id].respond(Response::User(user)).await;
@@ -69,9 +69,7 @@ impl ServerTask {
     async fn handle_get_room(&mut self, client_id: ClientId, name: String) {
         let room = self
             .db
-            .iter::<Room>()
-            .map(|(_, room)| room)
-            .find(|room| room.name == name)
+            .find::<Room, _>(|room| room.name == name)
             .map(|room| room.clone().into());
 
         self.db[client_id].respond(Response::Room(room)).await;
@@ -98,16 +96,27 @@ impl ServerTask {
         self.broadcast(user_id.enter_world()).await;
     }
 
+    async fn handle_create_room(&mut self, client_id: ClientId, name: String) {
+        let room = self.db.find::<Room, _>(|room| room.name == name);
+        let response = if room.is_none() {
+            let room = Room::new(name);
+            let _ = self.db.insert((room.id, room.clone()));
+
+            Response::CreatedRoom(room.into())
+        } else {
+            Response::Error
+        };
+
+        self.db[client_id].respond(response).await;
+    }
+
     async fn handle_event(&mut self, client_id: ClientId, event: Event) {
         match event.channel {
-            Channel::World => {
-                //
-                match event.event_type {
-                    EventType::Enter => unreachable!("Clients must not send Enter World events"),
-                    EventType::Leave => unreachable!("Clients must not send Leave World events"),
-                    EventType::Post { .. } => {}
-                }
-            }
+            Channel::World => match event.event_type {
+                EventType::Enter => return,
+                EventType::Leave => return,
+                _ => {}
+            },
             Channel::Room { room_id } => {
                 //
                 match event.event_type {
