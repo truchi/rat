@@ -35,10 +35,34 @@ async fn main() {
 
     let user = match stream.recv().await {
         Response::Connected(user) => user,
-        _ => unreachable!(),
+        x => unreachable!("{:?}", x),
     };
 
     println!("You are connected, {}!", user.name);
+    dbg!(stream.recv::<Response>().await);
+
+    {
+        stream.send(&Request::GetUser(user.name)).await;
+        let recv = stream.recv::<Response>().await;
+        dbg!(&recv);
+        stream.send(&Request::GetUser("lkjqhsdlkqjhd".into())).await;
+        let recv = stream.recv::<Response>().await;
+        dbg!(&recv);
+        stream.send(&Request::CreateRoom("my_room".into())).await;
+        let recv = stream.recv::<Response>().await;
+        dbg!(&recv);
+        stream.send(&Request::GetRoom("my_room".into())).await;
+        let room = match stream.recv::<Response>().await {
+            Response::Room(room) => room.unwrap(),
+            x => unreachable!("{:?}", x),
+        };
+        dbg!(&room);
+        stream
+            .send(&Request::Event(user.id.enter_room(room.id)))
+            .await;
+        let recv = stream.recv::<Response>().await;
+        dbg!(&recv);
+    }
 
     loop {
         let recv = stream.recv::<Response>().await;

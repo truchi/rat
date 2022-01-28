@@ -83,6 +83,34 @@ impl Db {
             .user_ids()
             .map(|&user_id| self.client(user_id))
     }
+
+    pub fn is_in(&self, user_id: UserId, room_id: RoomId) -> Result<bool, ()> {
+        let user = self.get(&user_id).ok_or(())?;
+        let room = self.get(&room_id).ok_or(())?;
+
+        if user.is_in(room_id) {
+            debug_assert!(room.has(user_id));
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn enter(&mut self, user_id: UserId, room_id: RoomId) -> Result<(), ()> {
+        self.get(&room_id).ok_or(())?;
+        self.get_mut(&user_id).ok_or(())?.enter(room_id);
+        self.get_mut(&room_id).unwrap().enter(user_id);
+
+        Ok(())
+    }
+
+    pub fn leave(&mut self, user_id: UserId, room_id: RoomId) -> Result<(), ()> {
+        self.get(&room_id).ok_or(())?;
+        self.get_mut(&user_id).ok_or(())?.leave(room_id);
+        self.get_mut(&room_id).unwrap().leave(user_id);
+
+        Ok(())
+    }
 }
 
 impl Db {

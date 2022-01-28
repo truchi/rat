@@ -111,20 +111,31 @@ impl ServerTask {
     }
 
     async fn handle_event(&mut self, client_id: ClientId, event: Event) {
+        let user_id = event.user_id;
+
         match event.channel {
             Channel::World => match event.event_type {
                 EventType::Enter => return,
                 EventType::Leave => return,
                 _ => {}
             },
-            Channel::Room { room_id } => {
-                //
-                match event.event_type {
-                    EventType::Enter => {}
-                    EventType::Leave => {}
-                    EventType::Post { .. } => {}
-                }
-            }
+            Channel::Room { room_id } => match event.event_type {
+                EventType::Enter =>
+                    if self.db.enter(user_id, room_id).is_err() {
+                        self.db[client_id].respond(Response::Error).await;
+                        return;
+                    },
+                EventType::Leave =>
+                    if self.db.leave(user_id, room_id).is_err() {
+                        self.db[client_id].respond(Response::Error).await;
+                        return;
+                    },
+                _ =>
+                    if self.db.is_in(user_id, room_id) != Ok(true) {
+                        self.db[client_id].respond(Response::Error).await;
+                        return;
+                    },
+            },
         }
 
         self.broadcast(event).await

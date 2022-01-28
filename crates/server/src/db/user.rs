@@ -22,6 +22,22 @@ impl User {
     pub fn room_ids(&self) -> std::slice::Iter<RoomId> {
         self.room_ids.iter()
     }
+
+    pub fn is_in(&self, room_id: RoomId) -> bool {
+        self.room_ids().find(|&&id| id == room_id).is_some()
+    }
+
+    pub fn enter(&mut self, room_id: RoomId) {
+        if !self.is_in(room_id) {
+            self.room_ids.push(room_id);
+        }
+    }
+
+    pub fn leave(&mut self, room_id: RoomId) {
+        if let Some(index) = self.room_ids().position(|&id| id == room_id) {
+            self.room_ids.swap_remove(index);
+        }
+    }
 }
 
 impl Into<rat::User> for User {

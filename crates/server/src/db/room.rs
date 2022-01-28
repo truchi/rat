@@ -20,6 +20,22 @@ impl Room {
     pub fn user_ids(&self) -> std::slice::Iter<UserId> {
         self.user_ids.iter()
     }
+
+    pub fn has(&self, user_id: UserId) -> bool {
+        self.user_ids().find(|&&id| id == user_id).is_some()
+    }
+
+    pub fn enter(&mut self, user_id: UserId) {
+        if !self.has(user_id) {
+            self.user_ids.push(user_id);
+        }
+    }
+
+    pub fn leave(&mut self, user_id: UserId) {
+        if let Some(index) = self.user_ids().position(|&id| id == user_id) {
+            self.user_ids.swap_remove(index);
+        }
+    }
 }
 
 impl Into<rat::Room> for Room {
