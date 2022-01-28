@@ -36,11 +36,14 @@ impl ServerTask {
         }
     }
 
-    async fn broadcast(&mut self, event: Event) {
+    async fn broadcast(&mut self, event: Event<UserId>) {
+        let user = &self.db[event.user];
+        let response = || Response::Event(event.clone().map(|_| user.clone().into()));
+
         let mut events = self
             .db
             .channel(&event)
-            .map(|client| client.respond(Response::Event(event.clone())))
+            .map(|client| client.respond(response()))
             .collect::<FuturesUnordered<_>>();
 
         while events.next().await.is_some() {}
@@ -110,8 +113,8 @@ impl ServerTask {
         self.db[client_id].respond(response).await;
     }
 
-    async fn handle_event(&mut self, client_id: ClientId, event: Event) {
-        let user_id = event.user_id;
+    async fn handle_event(&mut self, client_id: ClientId, event: Event<UserId>) {
+        let user_id = event.user;
 
         match event.channel {
             Channel::World => match event.event_type {

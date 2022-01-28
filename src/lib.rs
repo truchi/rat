@@ -79,18 +79,28 @@ pub struct Message {
 
 /// An event.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct Event {
+pub struct Event<T> {
     pub channel:    Channel,
-    pub user_id:    UserId,
+    pub user:       T,
     pub event_type: EventType,
 }
 
-impl Event {
-    pub fn new(channel: Channel, user_id: UserId, event_type: EventType) -> Self {
+impl<T> Event<T> {
+    pub fn new(channel: Channel, user: T, event_type: EventType) -> Self {
         Self {
             channel,
-            user_id,
+            user,
             event_type,
+        }
+    }
+}
+
+impl<T> Event<T> {
+    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Event<U> {
+        Event {
+            channel:    self.channel,
+            user:       f(self.user),
+            event_type: self.event_type,
         }
     }
 }
@@ -140,7 +150,7 @@ pub enum Request {
     GetRoom(String),
     Connect(String),
     CreateRoom(String),
-    Event(Event),
+    Event(Event<UserId>),
     Disconnect,
 }
 
@@ -152,7 +162,7 @@ pub enum Response {
     Room(Option<Room>),
     Connected(User),
     CreatedRoom(Room),
-    Event(Event),
+    Event(Event<User>),
     Disconnected,
     Error,
 }
