@@ -23,3 +23,12 @@ impl User {
         self.room_ids.iter()
     }
 }
+
+impl Into<rat::User> for User {
+    fn into(self) -> rat::User {
+        rat::User {
+            id:   self.id,
+            name: self.name,
+        }
+    }
+}

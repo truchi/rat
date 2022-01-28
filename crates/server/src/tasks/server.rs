@@ -21,8 +21,12 @@ impl ServerTask {
         while let Some(message) = self.from_client.recv().await {
             match message {
                 C2S::Accept(to_client) => self.handle_accept(to_client).await,
+                C2S::Request(client_id, Request::GetUser(name)) =>
+                    self.handle_get_user(client_id, name).await,
+                C2S::Request(client_id, Request::GetRoom(name)) =>
+                    self.handle_get_room(client_id, name).await,
                 C2S::Request(client_id, Request::Connect(name)) =>
-                    self.handle_connect_user(client_id, name).await,
+                    self.handle_connect(client_id, name).await,
                 C2S::Request(client_id, Request::Event(event)) =>
                     self.handle_event(client_id, event).await,
                 _ => {}
@@ -34,7 +38,7 @@ impl ServerTask {
         let mut events = self
             .db
             .channel(&event)
-            .map(|client| client.event(event.clone()))
+            .map(|client| client.respond(Response::Event(event.clone())))
             .collect::<FuturesUnordered<_>>();
 
         while events.next().await.is_some() {}
@@ -53,7 +57,37 @@ impl ServerTask {
             .expect("to_client closed"); // TODO remove client from db
     }
 
-    async fn handle_connect_user(&mut self, client_id: ClientId, name: String) {
+    async fn handle_get_user(&mut self, client_id: ClientId, name: String) {
+        let user = self
+            .db
+            .iter::<User>()
+            .map(|(_, user)| user)
+            .find(|user| user.name == name)
+            .map(|user| user.clone().into());
+
+        self.db
+            .get(&client_id)
+            .expect("Cannot find client")
+            .respond(Response::User(user))
+            .await;
+    }
+
+    async fn handle_get_room(&mut self, client_id: ClientId, name: String) {
+        let room = self
+            .db
+            .iter::<Room>()
+            .map(|(_, room)| room)
+            .find(|room| room.name == name)
+            .map(|room| room.clone().into());
+
+        self.db
+            .get(&client_id)
+            .expect("Cannot find client")
+            .respond(Response::Room(room))
+            .await;
+    }
+
+    async fn handle_connect(&mut self, client_id: ClientId, name: String) {
         // TODO unique name!
         let user = User::new(client_id, name);
         let user_id = user.id;

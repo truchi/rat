@@ -32,8 +32,4 @@ impl Client {
     pub async fn respond(&self, response: Response) -> Result<(), ()> {
         self.send(S2C::Response(response)).await
     }
-
-    pub async fn event(&self, event: Event) -> Result<(), ()> {
-        self.respond(Response::Event(event)).await
-    }
 }
