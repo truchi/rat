@@ -79,28 +79,18 @@ pub struct Message {
 
 /// An event.
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct Event<T> {
-    pub channel:    Channel,
-    pub user:       T,
+pub struct Event<U, R> {
+    pub channel:    Channel<R>,
+    pub user:       U,
     pub event_type: EventType,
 }
 
-impl<T> Event<T> {
-    pub fn new(channel: Channel, user: T, event_type: EventType) -> Self {
+impl<U, R> Event<U, R> {
+    pub fn new(channel: Channel<R>, user: U, event_type: EventType) -> Self {
         Self {
             channel,
             user,
             event_type,
-        }
-    }
-}
-
-impl<T> Event<T> {
-    pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> Event<U> {
-        Event {
-            channel:    self.channel,
-            user:       f(self.user),
-            event_type: self.event_type,
         }
     }
 }
@@ -115,9 +105,9 @@ pub enum EventType {
 
 /// A channel.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum Channel {
+pub enum Channel<R> {
     World,
-    Room { room_id: RoomId },
+    Room(R),
 }
 
 /// Serde [`send`](StreamExt::send) and [`recv`](StreamExt::recv)
@@ -150,7 +140,7 @@ pub enum Request {
     GetRoom(String),
     Connect(String),
     CreateRoom(String),
-    Event(Event<UserId>),
+    Event(Event<UserId, RoomId>),
     Disconnect,
 }
 
@@ -162,7 +152,7 @@ pub enum Response {
     Room(Option<Room>),
     Connected(User),
     CreatedRoom(Room),
-    Event(Event<User>),
+    Event(Event<User, Room>),
     Disconnected,
     Error,
 }

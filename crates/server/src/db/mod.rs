@@ -66,13 +66,6 @@ impl Db {
             .find(|value| predicate(value))
     }
 
-    pub fn channel<T>(&self, event: &Event<T>) -> impl Iterator<Item = &Client> {
-        match event.channel {
-            Channel::World => Box::new(self.world()) as Box<dyn Iterator<Item = _>>,
-            Channel::Room { room_id } => Box::new(self.room(room_id)),
-        }
-    }
-
     pub fn world(&self) -> impl Iterator<Item = &Client> {
         self.iter::<User>()
             .map(|(&user_id, _)| self.client(user_id))

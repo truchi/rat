@@ -36,14 +36,25 @@ impl ServerTask {
         }
     }
 
-    async fn broadcast(&mut self, event: Event<UserId>) {
-        let user = &self.db[event.user];
-        let response = || Response::Event(event.clone().map(|_| user.clone().into()));
+    async fn broadcast(&mut self, event: Event<UserId, RoomId>) {
+        let user = self.db[event.user].clone().into();
+        let event = match event.channel {
+            Channel::World => Event {
+                channel: Channel::World,
+                user,
+                event_type: event.event_type,
+            },
+            Channel::Room(room_id) => Event {
+                channel: Channel::Room(self.db[room_id].clone().into()),
+                user,
+                event_type: event.event_type,
+            },
+        };
 
         let mut events = self
             .db
-            .channel(&event)
-            .map(|client| client.respond(response()))
+            .world()
+            .map(|client| client.respond(Response::Event(event.clone())))
             .collect::<FuturesUnordered<_>>();
 
         while events.next().await.is_some() {}
@@ -113,7 +124,7 @@ impl ServerTask {
         self.db[client_id].respond(response).await;
     }
 
-    async fn handle_event(&mut self, client_id: ClientId, event: Event<UserId>) {
+    async fn handle_event(&mut self, client_id: ClientId, event: Event<UserId, RoomId>) {
         let user_id = event.user;
 
         match event.channel {
@@ -122,7 +133,7 @@ impl ServerTask {
                 EventType::Leave => return,
                 _ => {}
             },
-            Channel::Room { room_id } => match event.event_type {
+            Channel::Room(room_id) => match event.event_type {
                 EventType::Enter =>
                     if self.db.enter(user_id, room_id).is_err() {
                         self.db[client_id].respond(Response::Error).await;

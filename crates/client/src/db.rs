@@ -4,8 +4,8 @@ use std::collections::HashMap;
 /// Alias of `Ring<ChannelEvent>`.
 pub type Events = rat::ring::Ring<ChannelEvent>;
 
-/// Alias of `HashMap<Room, Events>`.
-pub type Rooms = HashMap<Room, Events>;
+/// Alias of `HashMap<RoomId, Events>`.
+pub type Rooms = HashMap<RoomId, Events>;
 
 /// A channel event.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -26,16 +26,16 @@ impl ChannelEvent {
         false
     }
 
-    pub fn from(event: Event) -> (Channel, Self) {
-        match event {
-            Event::Enter { channel, user } => (channel, ChannelEvent::Enter { user }),
-            Event::Leave { channel, user } => (channel, ChannelEvent::Leave { user }),
-            Event::Post {
-                channel,
-                user,
-                message,
-            } => (channel, ChannelEvent::Post { user, message }),
-        }
+    pub fn from(event: Event<User>) -> (Channel, Self) {
+        let channel = event.channel;
+        let user = event.user;
+        let event = match event.event_type {
+            EventType::Enter => ChannelEvent::Enter { user },
+            EventType::Leave => ChannelEvent::Leave { user },
+            EventType::Post { message } => ChannelEvent::Post { user, message },
+        };
+
+        (channel, event)
     }
 }
 
@@ -71,10 +71,10 @@ impl Db {
         &self.rooms
     }
 
-    pub fn push(&mut self, event: Event) {
+    pub fn push(&mut self, event: Event<User>) {
         match ChannelEvent::from(event) {
             (Channel::World, event) => self.push_world(event),
-            (Channel::Room { room }, event) => self.push_room(room, event),
+            (Channel::Room { room_id }, event) => self.push_room(room_id, event),
         }
     }
 
@@ -86,11 +86,11 @@ impl Db {
         self.world.push(event);
     }
 
-    fn push_room(&mut self, room: Room, event: ChannelEvent) {
+    fn push_room(&mut self, room_id: RoomId, event: ChannelEvent) {
         if event.is_leaving(&self.user) {
-            self.rooms.remove(&room);
+            self.rooms.remove(&room_id);
         } else {
-            self.rooms.entry(room).or_default().push(event);
+            self.rooms.entry(room_id).or_default().push(event);
         }
     }
 }
