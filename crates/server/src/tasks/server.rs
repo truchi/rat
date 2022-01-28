@@ -22,9 +22,20 @@ impl ServerTask {
             match message {
                 Accept(to_client) => self.handle_accept(to_client).await,
                 Request(id, ConnectUser { name }) => self.handle_connect_user(id, name).await,
+                Request(id, Event(event)) => self.handle_event(id, event).await,
                 _ => {}
             }
         }
+    }
+
+    async fn broadcast(&mut self, event: Event) {
+        let mut events = self
+            .db
+            .channel(&event)
+            .map(|client| client.event(event.clone()))
+            .collect::<FuturesUnordered<_>>();
+
+        while events.next().await.is_some() {}
     }
 
     async fn handle_accept(&mut self, to_client: ToClient) {
@@ -58,16 +69,30 @@ impl ServerTask {
             .await
             .expect("to_client closed");
 
-        self.broacast(user_id.enter_world()).await;
+        self.broadcast(user_id.enter_world()).await;
     }
 
-    async fn broacast(&mut self, event: Event) {
-        let mut events = self
-            .db
-            .channel(&event)
-            .map(|client| client.event(event.clone()))
-            .collect::<FuturesUnordered<_>>();
+    async fn handle_event(&mut self, client_id: ClientId, event: Event) {
+        match event.channel {
+            Channel::World => {
+                //
+                match event.event_type {
+                    Enter => unreachable!("Clients must not send Enter World events"),
+                    Leave => unreachable!("Clients must not send Leave World events"),
+                    Post { .. } => {}
+                }
+            }
+            Channel::Room { room_id } => {
+                //
+                match event.event_type {
+                    Enter => unreachable!("Clients must not send Enter World events"),
+                    Leave => unreachable!("Clients must not send Leave World events"),
+                    Post { .. } => {}
+                }
+            }
+            Channel::Private { user_id } => {}
+        }
 
-        while events.next().await.is_some() {}
+        self.broadcast(event).await
     }
 }

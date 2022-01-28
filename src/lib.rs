@@ -140,17 +140,24 @@ impl StreamExt for TcpStream {
 /// A [`Client`] request to the server.
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ClientRequest {
-    ConnectUser { name: String },
-    DisconnectUser,
-    Event(Event),
+    GetUser(String),
+    GetRoom(String),
+    Connect(String),
+    Disconnect,
+    Room(UserId, RoomId, EventType),
+    Private(UserId, UserId, EventType),
 }
 
 /// A server response to the [`Client`].
 #[derive(Deserialize, Serialize, Debug)]
 pub enum ServerResponse {
-    ConnectedUser(User),
-    DisconnectedUser,
-    Evented(Event),
+    Accepted(Client),
+    User(Option<User>),
+    Room(Option<Room>),
+    Connected(User),
+    Disconnected,
+    Event(Event),
+    Error,
 }
 
 pub async fn stdin() -> String {
