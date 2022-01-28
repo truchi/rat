@@ -6,14 +6,11 @@ pub mod ring;
 pub mod prelude {
     pub use super::Channel;
     pub use super::ClientId;
-    pub use super::ClientRequest;
-    pub use super::ClientRequest::*;
     pub use super::Event;
     pub use super::EventType;
-    pub use super::EventType::*;
+    pub use super::Request;
+    pub use super::Response;
     pub use super::RoomId;
-    pub use super::ServerResponse;
-    pub use super::ServerResponse::*;
     pub use super::StreamExt;
     pub use super::UserId;
 }
@@ -139,7 +136,7 @@ impl StreamExt for TcpStream {
 
 /// A [`Client`] request to the server.
 #[derive(Deserialize, Serialize, Debug)]
-pub enum ClientRequest {
+pub enum Request {
     GetUser(String),
     GetRoom(String),
     Connect(String),
@@ -150,7 +147,7 @@ pub enum ClientRequest {
 
 /// A server response to the [`Client`].
 #[derive(Deserialize, Serialize, Debug)]
-pub enum ServerResponse {
+pub enum Response {
     Accepted(Client),
     User(Option<User>),
     Room(Option<Room>),

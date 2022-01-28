@@ -20,9 +20,11 @@ impl ServerTask {
     pub async fn run(&mut self) {
         while let Some(message) = self.from_client.recv().await {
             match message {
-                Accept(to_client) => self.handle_accept(to_client).await,
-                Request(id, ConnectUser { name }) => self.handle_connect_user(id, name).await,
-                Request(id, Event(event)) => self.handle_event(id, event).await,
+                C2S::Accept(to_client) => self.handle_accept(to_client).await,
+                C2S::Request(id, Request::Connect(name)) =>
+                    self.handle_connect_user(id, name).await,
+                // C2S::Request(id, ClientRequest::Event(event)) => self.handle_event(id,
+                // event).await,
                 _ => {}
             }
         }
@@ -62,7 +64,7 @@ impl ServerTask {
 
         client.set_user(user_id);
         client
-            .respond(ConnectedUser(rat::User {
+            .respond(Response::Connected(rat::User {
                 id:   user_id,
                 name: user_name,
             }))
@@ -77,17 +79,17 @@ impl ServerTask {
             Channel::World => {
                 //
                 match event.event_type {
-                    Enter => unreachable!("Clients must not send Enter World events"),
-                    Leave => unreachable!("Clients must not send Leave World events"),
-                    Post { .. } => {}
+                    EventType::Enter => unreachable!("Clients must not send Enter World events"),
+                    EventType::Leave => unreachable!("Clients must not send Leave World events"),
+                    EventType::Post { .. } => {}
                 }
             }
             Channel::Room { room_id } => {
                 //
                 match event.event_type {
-                    Enter => unreachable!("Clients must not send Enter World events"),
-                    Leave => unreachable!("Clients must not send Leave World events"),
-                    Post { .. } => {}
+                    EventType::Enter => unreachable!("Clients must not send Enter World events"),
+                    EventType::Leave => unreachable!("Clients must not send Leave World events"),
+                    EventType::Post { .. } => {}
                 }
             }
             Channel::Private { user_id } => {}

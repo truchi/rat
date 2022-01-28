@@ -25,17 +25,17 @@ async fn main() {
 
     let name = std::env::args().skip(1).next().unwrap_or("anon".into());
 
-    stream.send(&ConnectUser { name }).await;
+    stream.send(&Request::Connect(name)).await;
 
     let user = match stream.recv().await {
-        ConnectedUser(user) => user,
+        Response::Connected(user) => user,
         _ => unreachable!(),
     };
 
     println!("You are connected, {}!", user.name);
 
     loop {
-        let recv = stream.recv::<ServerResponse>().await;
+        let recv = stream.recv::<Response>().await;
         dbg!(&recv);
     }
 }

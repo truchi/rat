@@ -13,8 +13,6 @@ use tokio::net::TcpStream;
 use tokio::select;
 use tokio::sync::mpsc;
 use tokio::sync::Mutex;
-use ClientToServer::*;
-use ServerToClient::*;
 
 #[doc(hidden)]
 macro_rules! mpsc_aliases {
@@ -31,18 +29,24 @@ mpsc_aliases!(
     ToServer   = Sender<ClientToServer>
 );
 
+/// Alias of [`ClientToServer`].
+pub type C2S = ClientToServer;
+
+/// Alias of [`ServerToClient`].
+pub type S2C = ServerToClient;
+
 /// [`ServerTask`] to [`ClientTask`] messages.
 #[derive(Debug)]
 pub enum ServerToClient {
     Accepted(ClientId),
-    Response(ServerResponse),
+    Response(Response),
 }
 
 /// [`ClientTask`] to [`ServerTask`] messages.
 #[derive(Debug)]
 pub enum ClientToServer {
     Accept(ToClient),
-    Request(ClientId, ClientRequest),
+    Request(ClientId, Request),
 }
 
 /// Runs the server.

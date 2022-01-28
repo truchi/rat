@@ -26,14 +26,14 @@ impl Client {
     }
 
     pub async fn accepted(&self, client_id: ClientId) -> Result<(), ()> {
-        self.send(Accepted(client_id)).await
+        self.send(S2C::Accepted(client_id)).await
     }
 
-    pub async fn respond(&self, response: ServerResponse) -> Result<(), ()> {
-        self.send(Response(response)).await
+    pub async fn respond(&self, response: Response) -> Result<(), ()> {
+        self.send(S2C::Response(response)).await
     }
 
     pub async fn event(&self, event: Event) -> Result<(), ()> {
-        self.respond(Evented(event)).await
+        self.respond(Response::Event(event)).await
     }
 }

@@ -13,8 +13,8 @@ impl ClientTask {
     pub async fn new(stream: TcpStream, to_server: ToServer) -> Result<Self, TcpStream> {
         let (to_client, mut from_server) = mpsc::channel(32);
 
-        if to_server.send(Accept(to_client)).await.is_ok() {
-            if let Some(Accepted(id)) = from_server.recv().await {
+        if to_server.send(C2S::Accept(to_client)).await.is_ok() {
+            if let Some(S2C::Accepted(id)) = from_server.recv().await {
                 return Ok(Self {
                     id,
                     stream,
@@ -34,20 +34,20 @@ impl ClientTask {
 
             select! {
                 request = request => self.handle_request(request).await,
-                Some(Response(response)) = response => self.handle_response(response).await,
+                Some(S2C::Response(response)) = response => self.handle_response(response).await,
                 else => break,
             }
         }
     }
 
-    async fn handle_request(&mut self, request: ClientRequest) {
+    async fn handle_request(&mut self, request: Request) {
         self.to_server
-            .send(Request(self.id, request))
+            .send(C2S::Request(self.id, request))
             .await
             .expect("to_server closed");
     }
 
-    async fn handle_response(&mut self, response: ServerResponse) {
+    async fn handle_response(&mut self, response: Response) {
         self.stream.send(&response).await;
     }
 }
