@@ -140,7 +140,7 @@ pub enum Request {
     GetRoom(String),
     Connect(String),
     Disconnect,
-    Room(UserId, RoomId, EventType),
+    Event(Event),
 }
 
 /// A server response to the [`Client`].

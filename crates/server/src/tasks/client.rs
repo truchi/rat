@@ -28,6 +28,10 @@ impl ClientTask {
     }
 
     pub async fn run(&mut self) {
+        self.stream
+            .send(&Response::Accepted(rat::Client { id: self.id }))
+            .await;
+
         loop {
             let request = self.stream.recv();
             let response = self.from_server.recv();

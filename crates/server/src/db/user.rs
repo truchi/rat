@@ -18,4 +18,8 @@ impl User {
             room_ids: Vec::new(),
         }
     }
+
+    pub fn room_ids(&self) -> std::slice::Iter<RoomId> {
+        self.room_ids.iter()
+    }
 }

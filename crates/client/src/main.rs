@@ -21,6 +21,12 @@ async fn main2() {
 async fn main() {
     let addr = "127.0.0.1:34254";
     let mut stream = TcpStream::connect(addr).await.unwrap();
+
+    let client = match stream.recv().await {
+        Response::Accepted(client) => client,
+        _ => unreachable!(),
+    };
+
     println!("Connected to server {}", addr);
 
     let name = std::env::args().skip(1).next().unwrap_or("anon".into());

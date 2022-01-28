@@ -21,10 +21,10 @@ impl ServerTask {
         while let Some(message) = self.from_client.recv().await {
             match message {
                 C2S::Accept(to_client) => self.handle_accept(to_client).await,
-                C2S::Request(id, Request::Connect(name)) =>
-                    self.handle_connect_user(id, name).await,
-                // C2S::Request(id, ClientRequest::Event(event)) => self.handle_event(id,
-                // event).await,
+                C2S::Request(client_id, Request::Connect(name)) =>
+                    self.handle_connect_user(client_id, name).await,
+                C2S::Request(client_id, Request::Event(event)) =>
+                    self.handle_event(client_id, event).await,
                 _ => {}
             }
         }
@@ -87,8 +87,8 @@ impl ServerTask {
             Channel::Room { room_id } => {
                 //
                 match event.event_type {
-                    EventType::Enter => unreachable!("Clients must not send Enter World events"),
-                    EventType::Leave => unreachable!("Clients must not send Leave World events"),
+                    EventType::Enter => {}
+                    EventType::Leave => {}
                     EventType::Post { .. } => {}
                 }
             }
