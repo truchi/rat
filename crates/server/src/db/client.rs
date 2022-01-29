@@ -4,7 +4,7 @@ use super::*;
 #[derive(Clone, Debug)]
 pub struct Client {
     pub id:        ClientId,
-    pub user_id:   Option<UserId>,
+    pub user:      Option<User>,
     pub to_client: ToClient,
 }
 
@@ -12,13 +12,13 @@ impl Client {
     pub fn new(to_client: ToClient) -> Self {
         Self {
             id: ClientId::new(),
-            user_id: None,
+            user: None,
             to_client,
         }
     }
 
-    pub fn set_user(&mut self, user_id: UserId) {
-        self.user_id = Some(user_id);
+    pub fn make_user(&mut self, name: String) {
+        self.user = Some(User::new(self.id, name));
     }
 
     pub async fn send(&self, message: ServerToClient) -> Result<(), ()> {
@@ -31,5 +31,10 @@ impl Client {
 
     pub async fn respond(&self, response: Response) -> Result<(), ()> {
         self.send(S2C::Response(response)).await
+    }
+
+    pub async fn connected(&self) -> Result<(), ()> {
+        self.respond(Response::Connected(self.user.clone().unwrap().into()))
+            .await
     }
 }

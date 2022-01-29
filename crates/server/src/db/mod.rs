@@ -56,6 +56,10 @@ impl Db {
         key.get_mut(self)
     }
 
+    pub fn remove<T: Remove>(&mut self, key: T) -> Option<T::V> {
+        key.remove(self)
+    }
+
     pub fn iter<T: Iter>(&self) -> std::collections::hash_map::Iter<T::K, T> {
         T::iter(self)
     }
@@ -77,6 +81,10 @@ impl Db {
             .map(|&user_id| self.client(user_id))
     }
 
+    pub fn is_in_world(&self, user_id: UserId) -> bool {
+        self.get(&user_id).is_some()
+    }
+
     pub fn is_in(&self, user_id: UserId, room_id: RoomId) -> Result<bool, ()> {
         let user = self.get(&user_id).ok_or(())?;
         let room = self.get(&room_id).ok_or(())?;
@@ -87,6 +95,23 @@ impl Db {
         } else {
             Ok(false)
         }
+    }
+
+    pub fn enter_world(&mut self, client_id: ClientId) -> Result<(), ()> {
+        let client = self.get(&client_id).ok_or(())?;
+        let user = client.user.clone().unwrap();
+
+        if self.get(&user.id).is_some() {
+            return Err(()); // Already in world
+        }
+
+        let _ = self.insert((user.id, user));
+        Ok(())
+    }
+
+    pub fn leave_world(&mut self, user_id: UserId) -> Result<(), ()> {
+        let _ = self.remove(&user_id);
+        Ok(())
     }
 
     pub fn enter(&mut self, user_id: UserId, room_id: RoomId) -> Result<(), ()> {
@@ -129,6 +154,13 @@ pub trait Get {
     fn get_mut(self, db: &mut Db) -> Option<&mut Self::V>;
 }
 
+/// [`remove`](Remove::remove) for [`Db`].
+pub trait Remove {
+    type V;
+
+    fn remove(self, db: &mut Db) -> Option<Self::V>;
+}
+
 /// [`iter`](Iter::iter) for [`Db`].
 pub trait Iter: Sized {
     type K;
@@ -156,6 +188,14 @@ macro_rules! impls {
 
             fn get_mut(self, db: &mut Db) -> Option<&mut Self::V> {
                 db.$field.get_mut(self)
+            }
+        }
+
+        impl Remove for &$K {
+            type V = $V;
+
+            fn remove(self, db: &mut Db) -> Option<Self::V> {
+                db.$field.remove(self)
             }
         }
 

@@ -90,24 +90,10 @@ impl ServerTask {
     }
 
     async fn handle_connect(&mut self, client_id: ClientId, name: String) {
-        // TODO unique name!
-        let user = User::new(client_id, name);
-        let user_id = user.id;
-        let user_name = user.name.clone();
-
-        let _ = self.db.insert((user_id, user));
         let client = &mut self.db[client_id];
 
-        client.set_user(user_id);
-        client
-            .respond(Response::Connected(rat::User {
-                id:   user_id,
-                name: user_name,
-            }))
-            .await
-            .expect("to_client closed");
-
-        self.broadcast(user_id.enter_world()).await;
+        client.make_user(name);
+        client.connected().await.expect("to_client closed");
     }
 
     async fn handle_create_room(&mut self, client_id: ClientId, name: String) {
@@ -129,9 +115,21 @@ impl ServerTask {
 
         match event.channel {
             Channel::World => match event.event_type {
-                EventType::Enter => return,
-                EventType::Leave => return,
-                _ => {}
+                EventType::Enter =>
+                    if self.db.enter_world(client_id).is_err() {
+                        self.db[client_id].respond(Response::Error).await;
+                        return;
+                    },
+                EventType::Leave =>
+                    if self.db.leave_world(user_id).is_err() {
+                        self.db[client_id].respond(Response::Error).await;
+                        return;
+                    },
+                _ =>
+                    if !self.db.is_in_world(user_id) {
+                        self.db[client_id].respond(Response::Error).await;
+                        return;
+                    },
             },
             Channel::Room(room_id) => match event.event_type {
                 EventType::Enter =>
