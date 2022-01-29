@@ -2,10 +2,8 @@ use super::*;
 
 #[derive(Debug)]
 pub struct UserNameView {
-    pub config:      Config,
-    pub label:       String,
-    pub placeholder: String,
-    pub value:       String,
+    pub config:       Config,
+    pub input_widget: InputWidget,
 }
 
 #[derive(Debug)]
@@ -15,39 +13,25 @@ pub enum UserNameHandled {
 }
 
 impl UserNameView {
-    pub fn render<W: Write>(&self, mut w: W) {
-        write!(w, "{}{}: ", x::MoveTo(1, 1), self.label);
-
-        if self.value.is_empty() {
-            write!(w, "{}", self.placeholder);
-        } else {
-            write!(w, "{}", self.value);
+    pub fn new(config: Config) -> Self {
+        Self {
+            config,
+            input_widget: InputWidget::new("Name: ", "<anon>", "", 1, 1, config),
         }
     }
 
-    pub fn handle(&mut self, event: x::Event) -> Option<UserNameHandled> {
-        match event {
-            x::Event::Key(x::KeyEvent { code, modifiers }) => match code {
-                x::KeyCode::Char(c) => {
-                    self.value.push(c);
-                    return Some(UserNameHandled::Redraw);
-                }
-                x::KeyCode::Backspace => {
-                    self.value.pop();
-                    return Some(UserNameHandled::Redraw);
-                }
-                x::KeyCode::Enter => return Some(UserNameHandled::Enter),
-                _ => {}
-            },
-            x::Event::Mouse(x::MouseEvent {
-                kind,
-                column,
-                row,
-                modifiers,
-            }) => {}
-            x::Event::Resize(columns, rows) => {}
-        }
+    pub fn render<W: Write>(&self, mut w: W) {
+        self.input_widget.render(w);
+    }
 
-        None
+    pub fn handle(&mut self, event: x::Event) -> Option<UserNameHandled> {
+        if let Some(handled) = self.input_widget.handle(event) {
+            Some(match handled {
+                InputHandled::Redraw => UserNameHandled::Redraw,
+                InputHandled::Enter => UserNameHandled::Enter,
+            })
+        } else {
+            None
+        }
     }
 }

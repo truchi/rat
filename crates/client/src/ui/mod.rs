@@ -1,8 +1,10 @@
 mod config;
 mod views;
+mod widgets;
 
 pub use config::*;
 pub use views::*;
+pub use widgets::*;
 
 use super::*;
 use futures::FutureExt;
@@ -69,12 +71,7 @@ pub async fn main(mut client: Client) {
     let mut out = out.lock();
 
     let config = Config::new();
-    let mut user_name_view = UserNameView {
-        config,
-        label: "Name".into(),
-        placeholder: "<anon>".into(),
-        value: "".into(),
-    };
+    let mut user_name_view = UserNameView::new(config);
 
     user_name_view.render(&mut out);
     out.flush();
@@ -100,10 +97,11 @@ pub async fn main(mut client: Client) {
                 out.flush();
             }
             Some(UserNameHandled::Enter) => {
-                let user_name = if user_name_view.value.is_empty() {
-                    user_name_view.placeholder
+                let input = user_name_view.input_widget;
+                let user_name = if input.value.is_empty() {
+                    input.placeholder
                 } else {
-                    user_name_view.value
+                    input.value
                 };
                 leave();
 
