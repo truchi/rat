@@ -1,8 +1,11 @@
 #![allow(unused)]
 
-// mod db;
+mod client;
+mod db;
 mod ui;
 
+use client::*;
+use db::*;
 use rat::prelude::*;
 use rat::stdin;
 use rat::Message;
@@ -11,14 +14,14 @@ use rat::User;
 use tokio::net::TcpStream;
 
 #[tokio::main]
-async fn main2() {
+async fn main() {
     ui::enter();
-    ui::main();
+    ui::main().await;
     ui::leave();
 }
 
 #[tokio::main]
-async fn main() {
+async fn main2() {
     let addr = "127.0.0.1:34254";
     let mut stream = TcpStream::connect(addr).await.unwrap();
 

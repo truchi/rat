@@ -1,16 +1,14 @@
+mod config;
+mod views;
+
+pub use config::*;
+pub use views::*;
+
+use futures::FutureExt;
+use futures::StreamExt;
 use std::io::stdout;
 use std::io::StdoutLock;
 use std::io::Write;
-
-macro_rules! rgb {
-    ($r:literal, $g:literal, $b:literal) => {
-        x::Color::Rgb {
-            r: $r,
-            g: $g,
-            b: $b,
-        }
-    };
-}
 
 mod x {
     pub use crossterm::cursor::position;
@@ -22,82 +20,19 @@ mod x {
     pub use crossterm::event::Event;
     pub use crossterm::event::EventStream;
     pub use crossterm::event::KeyCode;
+    pub use crossterm::event::KeyEvent;
+    pub use crossterm::event::MouseEvent;
+    pub use crossterm::event::MouseEventKind;
     pub use crossterm::execute;
     pub use crossterm::queue;
     pub use crossterm::style::Color;
     pub use crossterm::terminal::disable_raw_mode;
     pub use crossterm::terminal::enable_raw_mode;
     pub use crossterm::terminal::size;
+    pub use crossterm::terminal::Clear;
+    pub use crossterm::terminal::ClearType;
     pub use crossterm::terminal::EnterAlternateScreen;
     pub use crossterm::terminal::LeaveAlternateScreen;
-}
-
-#[derive(Copy, Clone, Debug)]
-struct Colors {
-    pub background: x::Color,
-    pub current:    x::Color,
-    pub foreground: x::Color,
-    pub comment:    x::Color,
-    pub cyan:       x::Color,
-    pub green:      x::Color,
-    pub orange:     x::Color,
-    pub pink:       x::Color,
-    pub purple:     x::Color,
-    pub red:        x::Color,
-    pub yellow:     x::Color,
-}
-
-const COLORS: Colors = Colors {
-    background: rgb!(40, 42, 54),
-    current:    rgb!(68, 71, 90),
-    foreground: rgb!(248, 248, 242),
-    comment:    rgb!(98, 114, 164),
-    cyan:       rgb!(139, 233, 253),
-    green:      rgb!(80, 250, 123),
-    orange:     rgb!(255, 184, 108),
-    pink:       rgb!(255, 121, 198),
-    purple:     rgb!(189, 147, 249),
-    red:        rgb!(255, 85, 85),
-    yellow:     rgb!(241, 250, 140),
-};
-
-#[derive(Copy, Clone, Debug)]
-struct Config {
-    pub width:  u16,
-    pub height: u16,
-    pub colors: Colors,
-}
-
-impl Config {
-    pub fn new() -> Self {
-        let (width, height) = x::size().unwrap();
-
-        Self {
-            width,
-            height,
-            colors: COLORS,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct UserNameView {
-    pub config:      Config,
-    pub label:       String,
-    pub placeholder: String,
-    pub value:       String,
-}
-
-impl UserNameView {
-    pub fn render<W: Write>(&self, mut w: W) {
-        write!(w, "{}{}: ", x::MoveTo(1, 1), self.label);
-
-        if self.value.is_empty() {
-            write!(w, "{}", self.placeholder);
-        } else {
-            write!(w, "{}", self.value);
-        }
-    }
 }
 
 pub fn enter() {
@@ -106,7 +41,7 @@ pub fn enter() {
         stdout(),
         x::EnableMouseCapture,
         x::EnterAlternateScreen,
-        // x::Hide
+        x::Hide
     )
     .unwrap();
 }
@@ -116,18 +51,18 @@ pub fn leave() {
         stdout(),
         x::DisableMouseCapture,
         x::LeaveAlternateScreen,
-        // x::Show
+        x::Show
     )
     .unwrap();
     x::disable_raw_mode().unwrap();
 }
 
-pub fn main() {
+pub async fn main() {
     let out = stdout();
     let mut out = out.lock();
 
     let config = Config::new();
-    let user_name_view = UserNameView {
+    let mut user_name_view = UserNameView {
         config,
         label: "Name".into(),
         placeholder: "<anon>".into(),
@@ -137,5 +72,53 @@ pub fn main() {
     user_name_view.render(&mut out);
     out.flush();
 
-    std::thread::sleep(std::time::Duration::from_secs(1));
+    let mut stream = x::EventStream::new();
+
+    while let Some(Ok(event)) = stream.next().await {
+        let mut redraw = false;
+
+        match event {
+            x::Event::Key(x::KeyEvent {
+                code: x::KeyCode::Esc,
+                modifiers,
+            }) => {
+                leave();
+                return std::process::exit(0);
+            }
+            x::Event::Key(x::KeyEvent { code, modifiers }) => match code {
+                x::KeyCode::Char(c) => {
+                    user_name_view.value.push(c);
+                    redraw = true;
+                }
+                x::KeyCode::Backspace => {
+                    user_name_view.value.pop();
+                    redraw = true;
+                }
+                x::KeyCode::Enter => {
+                    let user_name = if user_name_view.value.is_empty() {
+                        user_name_view.placeholder
+                    } else {
+                        user_name_view.value
+                    };
+                    leave();
+                    println!("GG {}", user_name);
+                    return std::process::exit(0);
+                }
+                _ => {}
+            },
+            x::Event::Mouse(x::MouseEvent {
+                kind,
+                column,
+                row,
+                modifiers,
+            }) => {}
+            x::Event::Resize(columns, rows) => {}
+        }
+
+        if redraw {
+            x::queue!(out, x::Clear(x::ClearType::All));
+            user_name_view.render(&mut out);
+            out.flush();
+        }
+    }
 }

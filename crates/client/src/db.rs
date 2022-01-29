@@ -26,7 +26,7 @@ impl ChannelEvent {
         false
     }
 
-    pub fn from(event: Event<User>) -> (Channel, Self) {
+    pub fn from(event: Event<User, Room>) -> (Channel<Room>, Self) {
         let channel = event.channel;
         let user = event.user;
         let event = match event.event_type {
@@ -71,10 +71,10 @@ impl Db {
         &self.rooms
     }
 
-    pub fn push(&mut self, event: Event<User>) {
+    pub fn push(&mut self, event: Event<User, Room>) {
         match ChannelEvent::from(event) {
             (Channel::World, event) => self.push_world(event),
-            (Channel::Room { room_id }, event) => self.push_room(room_id, event),
+            (Channel::Room(room), event) => self.push_room(room, event),
         }
     }
 
@@ -86,11 +86,11 @@ impl Db {
         self.world.push(event);
     }
 
-    fn push_room(&mut self, room_id: RoomId, event: ChannelEvent) {
+    fn push_room(&mut self, room: Room, event: ChannelEvent) {
         if event.is_leaving(&self.user) {
-            self.rooms.remove(&room_id);
+            self.rooms.remove(&room.id);
         } else {
-            self.rooms.entry(room_id).or_default().push(event);
+            self.rooms.entry(room.id).or_default().push(event);
         }
     }
 }
