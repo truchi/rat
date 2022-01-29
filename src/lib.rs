@@ -1,7 +1,11 @@
 #![allow(unused)]
 
-mod event;
 pub mod ring;
+
+mod event;
+mod stream_ext;
+
+pub use stream_ext::*;
 
 pub mod prelude {
     pub use super::Channel;
@@ -38,9 +42,6 @@ macro_rules! ids {
         }
     )* };
 }
-
-/// Capacity for buffers.
-pub const CAP: usize = 10 * 1024;
 
 ids!(
     /// A [`Client`] id.
@@ -108,29 +109,6 @@ pub enum EventType {
 pub enum Channel<R> {
     World,
     Room(R),
-}
-
-/// Serde [`send`](StreamExt::send) and [`recv`](StreamExt::recv)
-/// extensions for `TcpStream`s.
-#[async_trait]
-pub trait StreamExt {
-    async fn send<T: Sync + Serialize>(&mut self, value: &T);
-    async fn recv<T: DeserializeOwned>(&mut self) -> T;
-}
-
-#[async_trait]
-impl StreamExt for TcpStream {
-    async fn send<T: Sync + Serialize>(&mut self, value: &T) {
-        self.write(ron::ser::to_string(value).unwrap().as_bytes())
-            .await
-            .unwrap();
-    }
-
-    async fn recv<T: DeserializeOwned>(&mut self) -> T {
-        let mut buffer = [0; CAP];
-        let n = self.read(&mut buffer).await.unwrap();
-        ron::de::from_bytes(&buffer[..n]).unwrap()
-    }
 }
 
 /// A [`Client`] request to the server.
