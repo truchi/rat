@@ -38,7 +38,15 @@ impl ClientTask {
             let response = self.from_server.recv();
 
             select! {
-                Ok(request) = request => self.handle_request(request).await,
+                request = request => {
+                    match request {
+                        Ok(request) => self.handle_request(request).await,
+                        Err(error) => {
+                            self.handle_request(Request::Shutdown).await;
+                            break;
+                        },
+                    }
+                }
                 Some(S2C::Response(response)) = response => self.handle_response(response).await,
                 else => break,
             }

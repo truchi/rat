@@ -120,6 +120,7 @@ pub enum Request {
     CreateRoom(String),
     Event(Event<UserId, RoomId>),
     Disconnect,
+    Shutdown,
 }
 
 /// A server response to the [`Client`].

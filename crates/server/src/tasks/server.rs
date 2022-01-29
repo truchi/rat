@@ -31,6 +31,7 @@ impl ServerTask {
                     self.handle_create_room(client_id, name).await,
                 C2S::Request(client_id, Request::Event(event)) =>
                     self.handle_event(client_id, event).await,
+                C2S::Request(client_id, Request::Shutdown) => self.handle_shutdown(client_id),
                 _ => {}
             }
         }
@@ -116,7 +117,7 @@ impl ServerTask {
         match event.channel {
             Channel::World => match event.event_type {
                 EventType::Enter =>
-                    if self.db.enter_world(client_id).is_err() {
+                    if self.db.enter_world(client_id, user_id).is_err() {
                         self.db[client_id].respond(Response::Error).await;
                         return;
                     },
@@ -151,5 +152,13 @@ impl ServerTask {
         }
 
         self.broadcast(event).await
+    }
+
+    fn handle_shutdown(&mut self, client_id: ClientId) {
+        if let Some(client) = self.db.remove(&client_id) {
+            if let Some(user) = client.user {
+                self.db.leave_world(user.id);
+            }
+        }
     }
 }

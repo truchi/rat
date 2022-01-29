@@ -59,7 +59,9 @@ async fn main() {
     let (to_server, from_client) = mpsc::channel(32);
 
     let server = tokio::spawn(async move {
+        println!("ServerTask spawned!");
         ServerTask::new(from_client).run().await;
+        println!("ServerTask done!");
     });
 
     loop {
@@ -67,9 +69,13 @@ async fn main() {
         let to_server = to_server.clone();
 
         tokio::spawn(async move {
+            println!("ClientTask spawned!");
+
             if let Ok(mut task) = ClientTask::new(stream, to_server).await {
                 task.run().await;
             }
+
+            println!("ClientTask done!");
         });
     }
 }

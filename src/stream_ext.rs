@@ -39,6 +39,7 @@ impl StreamExt for TcpStream {
             buffer.resize(n + CHUNK, 0);
 
             match self.try_read(&mut buffer[n..]) {
+                Ok(0) if n == 0 => return Err(io::Error::new(ErrorKind::Other, "Cannot recv()")),
                 Ok(m) => n += m,
                 Err(e) if e.kind() == ErrorKind::WouldBlock => break,
                 Err(e) => return Err(e),

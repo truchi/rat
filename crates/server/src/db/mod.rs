@@ -97,9 +97,13 @@ impl Db {
         }
     }
 
-    pub fn enter_world(&mut self, client_id: ClientId) -> Result<(), ()> {
+    pub fn enter_world(&mut self, client_id: ClientId, user_id: UserId) -> Result<(), ()> {
         let client = self.get(&client_id).ok_or(())?;
         let user = client.user.clone().unwrap();
+
+        if user.id != user_id {
+            return Err(());
+        }
 
         if self.get(&user.id).is_some() {
             return Err(()); // Already in world
@@ -110,8 +114,15 @@ impl Db {
     }
 
     pub fn leave_world(&mut self, user_id: UserId) -> Result<(), ()> {
-        let _ = self.remove(&user_id);
-        Ok(())
+        if let Some(user) = self.remove(&user_id) {
+            for &room_id in user.room_ids() {
+                self.leave(user_id, room_id);
+            }
+
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 
     pub fn enter(&mut self, user_id: UserId, room_id: RoomId) -> Result<(), ()> {
