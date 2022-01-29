@@ -1,4 +1,5 @@
 use super::*;
+use std::io;
 
 /// A task interfacing between a [`Client`](db::Client)
 /// and the [`ServerTask`].
@@ -37,7 +38,7 @@ impl ClientTask {
             let response = self.from_server.recv();
 
             select! {
-                request = request => self.handle_request(request).await,
+                Ok(request) = request => self.handle_request(request).await,
                 Some(S2C::Response(response)) = response => self.handle_response(response).await,
                 else => break,
             }

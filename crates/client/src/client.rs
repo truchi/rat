@@ -12,7 +12,7 @@ impl Client {
     pub async fn connect(addr: String) -> Self {
         let mut stream = TcpStream::connect(&addr).await.unwrap();
 
-        let id = match stream.recv().await {
+        let id = match stream.recv().await.expect("Server error") {
             Response::Accepted(client) => client.id,
             _ => unreachable!(), // TODO
         };
@@ -28,7 +28,7 @@ impl Client {
     pub async fn connect_user(&mut self, name: String) {
         self.stream.send(&Request::Connect(name)).await;
 
-        let user = match self.stream.recv().await {
+        let user = match self.stream.recv().await.expect("Server error") {
             Response::Connected(user) => user,
             _ => unreachable!(), // TODO
         };

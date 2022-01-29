@@ -1,98 +1,51 @@
 use super::*;
+use ron::de;
+use ron::ser;
+use std::io;
+use std::io::ErrorKind;
 
 /// Capacity for buffers.
 pub const CAP: usize = 10 * 1024;
+
+const SER_ERROR: &str = "Serialization error";
+const DE_ERROR: &str = "Deserialization error";
 
 /// Serde [`send`](StreamExt::send) and [`recv`](StreamExt::recv)
 /// extensions for `TcpStream`s.
 #[async_trait]
 pub trait StreamExt {
-    async fn send<T: Sync + Serialize + std::fmt::Debug>(&mut self, value: &T);
-    async fn recv<T: DeserializeOwned>(&mut self) -> T;
+    async fn send<T: Sync + Serialize>(&mut self, value: &T) -> io::Result<()>;
+    async fn recv<T: DeserializeOwned>(&mut self) -> io::Result<T>;
 }
 
 #[async_trait]
 impl StreamExt for TcpStream {
-    async fn send<T: Sync + Serialize + std::fmt::Debug>(&mut self, value: &T) {
-        self.write_all(ron::ser::to_string(value).unwrap().as_bytes())
-            .await
-            .unwrap();
-        println!("Sent {:?}", value);
+    async fn send<T: Sync + Serialize>(&mut self, value: &T) -> io::Result<()> {
+        let string = ser::to_string_pretty(value, Default::default()).expect(SER_ERROR);
+        self.write_all(string.as_bytes()).await?;
+        println!("Sent: {}", string);
+        Ok(())
     }
 
-    async fn recv<T: DeserializeOwned>(&mut self) -> T {
-        let mut buffer = [0; CAP];
-        let n = self.read(&mut buffer).await.unwrap();
-        ron::de::from_bytes(&buffer[..n]).unwrap()
-    }
-
-    /*
-    async fn recv<T: DeserializeOwned>(&mut self) -> T {
+    async fn recv<T: DeserializeOwned>(&mut self) -> io::Result<T> {
         const CHUNK: usize = 1024;
 
         let mut buffer = Vec::new();
         let mut n = 0;
 
         loop {
-            dbg!(n);
             self.readable().await.unwrap();
+            debug_assert!(n + CHUNK >= buffer.len());
             buffer.resize(n + CHUNK, 0);
-            println!("readable {}", &mut buffer[n..].len());
 
             match self.try_read(&mut buffer[n..]) {
-                Ok(0) => {
-                    break;
-                }
-                Ok(m) => {
-                    n += m;
-                }
-                Err(ref e) if e.kind() == tokio::io::ErrorKind::WouldBlock => {
-                    break;
-                }
-                Err(e) => {
-                    dbg!(e);
-                    panic!();
-                    // return Err(e.into());
-                }
+                Ok(m) => n += m,
+                Err(e) if e.kind() == ErrorKind::WouldBlock => break,
+                Err(e) => return Err(e),
             }
         }
 
-        dbg!(utf8(&buffer[..n]));
-        ron::de::from_bytes(&buffer[..n]).unwrap()
-    }
-    */
-
-    /*
-    async fn recv2<T: DeserializeOwned>(&mut self) -> T {
-        let mut buffer = Vec::new();
-        loop {
-            let n = self.read_buf(&mut buffer).await.unwrap();
-            dbg!(n);
-            match std::str::from_utf8(&buffer) {
-                Ok(str) => {
-                    dbg!(str);
-                }
-                Err(err) => {
-                    let n = err.valid_up_to();
-                    dbg!(&buffer[..n]);
-                }
-            }
-            // if n == 0 {
-            // break;
-            // }
-        }
-        ron::de::from_bytes(&buffer[..]).unwrap()
-    }
-    */
-}
-
-fn utf8(str: &[u8]) -> &str {
-    match std::str::from_utf8(str) {
-        Ok(str) => str,
-        Err(err) => {
-            let n = err.valid_up_to();
-            dbg!("valid up to", n);
-            unsafe { std::str::from_utf8_unchecked(&str[..n]) }
-        }
+        println!("Received: {}", std::str::from_utf8(&buffer[..n]).unwrap());
+        Ok(de::from_bytes(&buffer[..n]).expect(DE_ERROR))
     }
 }
