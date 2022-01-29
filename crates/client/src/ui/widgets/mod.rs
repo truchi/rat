@@ -1,5 +1,5 @@
-mod input;
-
-pub use input::*;
+pub mod input;
 
 use super::*;
+
+pub use input::Input;

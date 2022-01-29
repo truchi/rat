@@ -1,7 +1,7 @@
-mod channel;
-mod user_name;
+pub mod channel;
+pub mod welcome;
 
 use super::*;
 
 pub use channel::*;
-pub use user_name::*;
+pub use welcome::Welcome;

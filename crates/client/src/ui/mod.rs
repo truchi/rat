@@ -71,9 +71,9 @@ pub async fn main(mut client: Client) {
     let mut out = out.lock();
 
     let config = Config::new();
-    let mut user_name_view = UserNameView::new(config);
+    let mut welcome = Welcome::new(config);
 
-    user_name_view.render(&mut out);
+    welcome.render(&mut out);
     out.flush();
 
     let mut stream = x::EventStream::new();
@@ -90,23 +90,19 @@ pub async fn main(mut client: Client) {
             return exit();
         }
 
-        match user_name_view.handle(event) {
-            Some(UserNameHandled::Redraw) => {
+        match welcome.handle(event) {
+            Some(welcome::Flow::Redraw) => {
                 x::queue!(out, x::Clear(x::ClearType::All));
-                user_name_view.render(&mut out);
+                welcome.render(&mut out);
                 out.flush();
             }
-            Some(UserNameHandled::Enter) => {
-                let input = user_name_view.input_widget;
-                let user_name = if input.value.is_empty() {
-                    input.placeholder
-                } else {
-                    input.value
-                };
+            Some(welcome::Flow::Enter) => {
+                let name: String = welcome.input.value().into();
+
                 leave();
 
-                let mut connection = client.connect_user(user_name.clone()).await;
-                println!("GG {}", user_name);
+                let mut connection = client.connect_user(name.clone()).await;
+                println!("GG {}", name);
                 connection.enter_world().await;
                 dbg!(connection.db());
 
