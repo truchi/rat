@@ -3,13 +3,14 @@ use tokio::net::ToSocketAddrs;
 
 pub struct Client {
     id:     ClientId,
+    addr:   String,
     stream: TcpStream,
     db:     Option<Db>,
 }
 
 impl Client {
-    pub async fn connect<A: ToSocketAddrs>(addr: A) -> Self {
-        let mut stream = TcpStream::connect(addr).await.unwrap();
+    pub async fn connect(addr: String) -> Self {
+        let mut stream = TcpStream::connect(&addr).await.unwrap();
 
         let id = match stream.recv().await {
             Response::Accepted(client) => client.id,
@@ -18,6 +19,7 @@ impl Client {
 
         Self {
             id,
+            addr,
             stream,
             db: None,
         }

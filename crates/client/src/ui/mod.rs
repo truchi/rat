@@ -4,6 +4,7 @@ mod views;
 pub use config::*;
 pub use views::*;
 
+use super::*;
 use futures::FutureExt;
 use futures::StreamExt;
 use std::io::stdout;
@@ -57,7 +58,7 @@ pub fn leave() {
     x::disable_raw_mode().unwrap();
 }
 
-pub async fn main() {
+pub async fn main(mut client: Client) {
     let out = stdout();
     let mut out = out.lock();
 
@@ -101,7 +102,9 @@ pub async fn main() {
                         user_name_view.value
                     };
                     leave();
+                    client.connect_user(user_name.clone()).await;
                     println!("GG {}", user_name);
+
                     return std::process::exit(0);
                 }
                 _ => {}
