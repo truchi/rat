@@ -22,6 +22,7 @@ mod x {
     pub use crossterm::event::EventStream;
     pub use crossterm::event::KeyCode;
     pub use crossterm::event::KeyEvent;
+    pub use crossterm::event::KeyModifiers;
     pub use crossterm::event::MouseEvent;
     pub use crossterm::event::MouseEventKind;
     pub use crossterm::execute;
@@ -58,6 +59,11 @@ pub fn leave() {
     x::disable_raw_mode().unwrap();
 }
 
+pub fn exit() {
+    leave();
+    std::process::exit(0);
+}
+
 pub async fn main(mut client: Client) {
     let out = stdout();
     let mut out = out.lock();
@@ -78,50 +84,37 @@ pub async fn main(mut client: Client) {
     while let Some(Ok(event)) = stream.next().await {
         let mut redraw = false;
 
-        match event {
-            x::Event::Key(x::KeyEvent {
-                code: x::KeyCode::Esc,
-                modifiers,
-            }) => {
-                leave();
-                return std::process::exit(0);
-            }
-            x::Event::Key(x::KeyEvent { code, modifiers }) => match code {
-                x::KeyCode::Char(c) => {
-                    user_name_view.value.push(c);
-                    redraw = true;
-                }
-                x::KeyCode::Backspace => {
-                    user_name_view.value.pop();
-                    redraw = true;
-                }
-                x::KeyCode::Enter => {
-                    let user_name = if user_name_view.value.is_empty() {
-                        user_name_view.placeholder
-                    } else {
-                        user_name_view.value
-                    };
-                    leave();
-                    client.connect_user(user_name.clone()).await;
-                    println!("GG {}", user_name);
+        let quit = x::KeyEvent {
+            code:      x::KeyCode::Char('c'),
+            modifiers: x::KeyModifiers::CONTROL,
+        };
 
-                    return std::process::exit(0);
-                }
-                _ => {}
-            },
-            x::Event::Mouse(x::MouseEvent {
-                kind,
-                column,
-                row,
-                modifiers,
-            }) => {}
-            x::Event::Resize(columns, rows) => {}
+        if event == x::Event::Key(quit) {
+            return exit();
         }
 
-        if redraw {
-            x::queue!(out, x::Clear(x::ClearType::All));
-            user_name_view.render(&mut out);
-            out.flush();
+        match user_name_view.handle(event) {
+            Some(UserNameHandled::Redraw) => {
+                x::queue!(out, x::Clear(x::ClearType::All));
+                user_name_view.render(&mut out);
+                out.flush();
+            }
+            Some(UserNameHandled::Enter) => {
+                let user_name = if user_name_view.value.is_empty() {
+                    user_name_view.placeholder
+                } else {
+                    user_name_view.value
+                };
+                leave();
+
+                let mut connection = client.connect_user(user_name.clone()).await;
+                println!("GG {}", user_name);
+                connection.enter_world().await;
+                dbg!(connection.db());
+
+                return std::process::exit(0);
+            }
+            _ => {}
         }
     }
 }
