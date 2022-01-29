@@ -19,7 +19,7 @@ async fn main() {
     let client = Client::connect(addr.into()).await;
 
     ui::enter();
-    ui::main(client).await;
+    let _ = ui::main(client).await;
     ui::leave();
 }
 

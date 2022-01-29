@@ -54,24 +54,28 @@ impl Connection {
         self.db.user()
     }
 
-    pub async fn enter_world(&mut self) {
-        let response = self
-            .send(Request::Event(self.user().id.enter_world()))
-            .await;
-
+    pub async fn next(&mut self) {
+        let response = self.recv().await;
         match response {
             Response::Event(event) => self.db.push(event),
             _ => unreachable!(), // TODO
         }
     }
 
-    async fn send(&mut self, request: Request) -> Response {
+    pub async fn enter_world(&mut self) {
+        self.send(Request::Event(self.user().id.enter_world()))
+            .await;
+    }
+
+    async fn send(&mut self, request: Request) {
         self.client
             .stream
             .send(&request)
             .await
             .expect("Server error");
+    }
 
+    async fn recv(&mut self) -> Response {
         self.client.stream.recv().await.expect("Server error")
     }
 }

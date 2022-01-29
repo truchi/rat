@@ -14,3 +14,4 @@ serde = { version = "1", features = ["derive"] }
 ron = "0.7"
 
 crossterm = { version = "0.22", features = ["event-stream"] }
+textwrap = { version = "0.14", features = ["unicode-linebreak", "unicode-width", "smawk"] }

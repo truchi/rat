@@ -1,34 +1,30 @@
 use super::*;
 
 #[derive(Debug)]
-pub enum Flow {
-    Redraw,
-    Enter,
-}
-
-#[derive(Debug)]
-pub struct Welcome {
+pub struct WelcomeView {
     pub config: Config,
     pub input:  Input,
 }
 
-impl Welcome {
+impl WelcomeView {
     pub fn new(config: Config) -> Self {
         Self {
             config,
             input: Input::new("Name: ", "<anon>", ""),
         }
     }
+}
 
-    pub fn render<W: Write>(&self, mut w: W) {
+impl View for WelcomeView {
+    fn render<W: Write>(&self, mut w: W) {
         self.input.render(1, 1, self.config, w);
     }
 
-    pub fn handle(&mut self, event: x::Event) -> Option<Flow> {
+    fn handle(&mut self, event: x::Event) -> Option<Flow> {
         if let Some(handled) = self.input.handle(event) {
             Some(match handled {
-                input::Flow::Redraw => Flow::Redraw,
-                input::Flow::Enter => Flow::Enter,
+                Flow::Redraw => Flow::Redraw,
+                Flow::Submit => Flow::Submit,
             })
         } else {
             None

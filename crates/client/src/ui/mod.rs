@@ -7,6 +7,7 @@ pub use views::*;
 pub use widgets::*;
 
 use super::*;
+use futures::future::ready;
 use futures::FutureExt;
 use futures::StreamExt;
 use std::io::stdout;
@@ -66,49 +67,88 @@ pub fn exit() {
     std::process::exit(0);
 }
 
-pub async fn main(mut client: Client) {
+#[derive(Debug)]
+pub enum Flow {
+    Redraw,
+    Submit,
+}
+
+pub trait View {
+    fn render<W: Write>(&self, w: W);
+    fn handle(&mut self, event: x::Event) -> Option<Flow>;
+}
+
+trait WriteExt: Write + Sized {
+    fn clear(&mut self) {
+        x::queue!(self, x::Clear(x::ClearType::All));
+    }
+
+    fn render<V: View>(mut self: &mut Self, view: &V) {
+        self.clear();
+        view.render(&mut self);
+        self.flush();
+    }
+}
+
+impl<W: Write> WriteExt for W {}
+
+pub async fn main(mut client: Client) -> Option<()> {
     let out = stdout();
     let mut out = out.lock();
 
     let config = Config::new();
-    let mut welcome = Welcome::new(config);
-
-    welcome.render(&mut out);
-    out.flush();
+    let quit = x::KeyEvent {
+        code:      x::KeyCode::Char('c'),
+        modifiers: x::KeyModifiers::CONTROL,
+    };
 
     let mut stream = x::EventStream::new();
+    let mut stream = Box::pin(
+        stream
+            .filter_map(|event| async move { event.ok() })
+            .take_while(|event| ready(*event != x::Event::Key(quit))),
+    );
 
-    while let Some(Ok(event)) = stream.next().await {
-        let mut redraw = false;
+    let mut welcome_view = WelcomeView::new(config);
+    out.render(&welcome_view);
 
-        let quit = x::KeyEvent {
-            code:      x::KeyCode::Char('c'),
-            modifiers: x::KeyModifiers::CONTROL,
-        };
+    let mut name: Option<String> = None;
 
-        if event == x::Event::Key(quit) {
-            return exit();
-        }
-
-        match welcome.handle(event) {
-            Some(welcome::Flow::Redraw) => {
-                x::queue!(out, x::Clear(x::ClearType::All));
-                welcome.render(&mut out);
-                out.flush();
+    while let Some(event) = stream.next().await {
+        match welcome_view.handle(event) {
+            Some(Flow::Redraw) => {
+                out.render(&welcome_view);
             }
-            Some(welcome::Flow::Enter) => {
-                let name: String = welcome.input.value().into();
-
-                leave();
-
-                let mut connection = client.connect_user(name.clone()).await;
-                println!("GG {}", name);
-                connection.enter_world().await;
-                dbg!(connection.db());
-
-                return std::process::exit(0);
+            Some(Flow::Submit) => {
+                name = Some(welcome_view.input.value().into());
+                break;
             }
             _ => {}
         }
     }
+
+    let name = name?;
+
+    let mut connection = client.connect_user(name.clone()).await;
+    connection.enter_world().await;
+
+    let mut channel_view = ChannelView::new(config);
+    out.render(&channel_view);
+
+    while let Some(event) = stream.next().await {
+        match channel_view.handle(event) {
+            Some(Flow::Redraw) => {
+                out.render(&channel_view);
+            }
+            Some(Flow::Submit) => {
+                let message: String = channel_view.input.value().into();
+                channel_view.input.clear();
+
+                out.render(&channel_view);
+            }
+            _ => {}
+        }
+    }
+
+    Some(())
 }

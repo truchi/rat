@@ -3,5 +3,5 @@ pub mod welcome;
 
 use super::*;
 
-pub use channel::*;
-pub use welcome::Welcome;
+pub use channel::ChannelView;
+pub use welcome::WelcomeView;

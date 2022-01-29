@@ -1,12 +1,6 @@
 use super::*;
 
 #[derive(Debug)]
-pub enum Flow {
-    Redraw,
-    Enter,
-}
-
-#[derive(Debug)]
 pub struct Input {
     pub label:       String,
     pub placeholder: String,
@@ -34,6 +28,10 @@ impl Input {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.value.clear();
+    }
+
     pub fn render<W: Write>(&self, x: u16, y: u16, config: Config, mut w: W) {
         write!(w, "{}{}{}", x::MoveTo(x, y), self.label, self.value());
     }
@@ -49,7 +47,7 @@ impl Input {
                     self.value.pop();
                     return Some(Flow::Redraw);
                 }
-                x::KeyCode::Enter => return Some(Flow::Enter),
+                x::KeyCode::Enter => return Some(Flow::Submit),
                 _ => {}
             },
             _ => {}

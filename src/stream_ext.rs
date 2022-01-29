@@ -23,7 +23,6 @@ impl StreamExt for TcpStream {
     async fn send<T: Sync + Serialize>(&mut self, value: &T) -> io::Result<()> {
         let string = ser::to_string_pretty(value, Default::default()).expect(SER_ERROR);
         self.write_all(string.as_bytes()).await?;
-        println!("Sent: {}", string);
         Ok(())
     }
 
@@ -46,7 +45,6 @@ impl StreamExt for TcpStream {
             }
         }
 
-        println!("Received: {}", std::str::from_utf8(&buffer[..n]).unwrap());
         Ok(de::from_bytes(&buffer[..n]).expect(DE_ERROR))
     }
 }
