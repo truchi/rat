@@ -57,4 +57,13 @@ impl Config {
             colors: COLORS,
         }
     }
+
+    pub fn rect(&self) -> Rect {
+        Rect {
+            x: 0,
+            y: 0,
+            w: self.width,
+            h: self.height,
+        }
+    }
 }

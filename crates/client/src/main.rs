@@ -15,11 +15,11 @@ use tokio::net::TcpStream;
 
 #[tokio::main]
 async fn main() {
-    let addr = "127.0.0.1:34254";
-    let client = Client::connect(addr.into()).await;
+    // let addr = "127.0.0.1:34254";
+    // let client = Client::connect(addr.into()).await;
 
     ui::enter();
-    let _ = ui::main(client).await;
+    let _ = ui::main().await;
     ui::leave();
 }
 

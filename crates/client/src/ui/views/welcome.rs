@@ -16,7 +16,9 @@ impl WelcomeView {
 }
 
 impl View for WelcomeView {
-    fn render<W: Write>(&self, mut w: W) {
+    type Props = ();
+
+    fn render<W: Write>(&self, mut w: W, _: Self::Props) {
         self.input.render(1, 1, self.config, w);
     }
 

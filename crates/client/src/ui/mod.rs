@@ -73,9 +73,52 @@ pub enum Flow {
     Submit,
 }
 
-pub trait View {
+#[derive(Copy, Clone, Default, Debug)]
+pub struct Rect {
+    x: u16,
+    y: u16,
+    w: u16,
+    h: u16,
+}
+
+impl Rect {
+    pub fn up(&self, rows: u16) -> Self {
+        let mut rect = *self;
+        rect.x -= rows;
+        rect
+    }
+
+    pub fn down(&self, rows: u16) -> Self {
+        let mut rect = *self;
+        rect.x += rows;
+        rect
+    }
+
+    pub fn move_to<W: Write>(&self, mut w: W) {
+        x::queue!(&mut w, x::MoveTo(self.x, self.y));
+    }
+}
+
+impl From<(u16, u16, u16, u16)> for Rect {
+    fn from((x, y, w, h): (u16, u16, u16, u16)) -> Self {
+        Self { x, y, w, h }
+    }
+}
+
+pub trait View: Sized {
+    type Props: Default;
+    type State: Default;
+
+    fn new(config: Config) -> Self;
+    fn set_props(&mut self, props: Self::Props);
     fn render<W: Write>(&self, w: W);
-    fn handle(&mut self, event: x::Event) -> Option<Flow>;
+    // fn handle(&mut self, event: x::Event) -> Option<Flow>;
+
+    fn with_props(config: Config, props: Self::Props) -> Self {
+        let mut view = Self::new(config);
+        view.set_props(props);
+        view
+    }
 }
 
 trait WriteExt: Write + Sized {
@@ -92,7 +135,47 @@ trait WriteExt: Write + Sized {
 
 impl<W: Write> WriteExt for W {}
 
-pub async fn main(mut client: Client) -> Option<()> {
+pub async fn main() -> Option<()> {
+    let out = stdout();
+    let mut out = out.lock();
+    let config = Config::new();
+
+    let messages = vec![
+        "Hello, world!".into(),
+        "Hello, world!".into(),
+        "Hello, world!".into(),
+        "Hello, world!".into(),
+        "Hello, world!".into(),
+        "Hello, world!".into(),
+        "Hello, world!".into(),
+        "Hello, world!".into(),
+        r#"""
+        Lorem ipsum dolor sit amet,
+        consectetur adipiscing elit,
+        sed do eiusmod tempor incididunt
+        ut labore et dolore magna aliqua.
+        Ut enim ad minim veniam, quis
+        nostrud exercitation ullamco laboris
+        nisi ut aliquip ex ea commodo consequat.
+        Duis aute irure dolor in reprehenderit
+        in voluptate velit esse cillum dolore
+        eu fugiat nulla pariatur. Excepteur
+        sint occaecat cupidatat non proident,
+        sunt in culpa qui officia deserunt
+        mollit anim id est laborum.
+        """#
+        .into(),
+    ];
+
+    let channel_view_props = ChannelViewProps { messages };
+    let mut channel_view = ChannelView::with_props(config, channel_view_props);
+    out.render(&channel_view);
+
+    None
+}
+
+/*
+pub async fn main2(mut client: Client) -> Option<()> {
     let out = stdout();
     let mut out = out.lock();
 
@@ -152,3 +235,4 @@ pub async fn main(mut client: Client) -> Option<()> {
 
     Some(())
 }
+*/
