@@ -5,7 +5,7 @@ use std::collections::HashMap;
 pub type Events = rat::ring::Ring<ChannelEvent>;
 
 /// Alias of `HashMap<RoomId, Events>`.
-pub type Rooms = HashMap<RoomId, Events>;
+pub type Rooms = HashMap<RoomId, (Room, Events)>;
 
 /// A channel event.
 #[derive(Clone, Eq, PartialEq, Debug)]
@@ -90,7 +90,104 @@ impl Db {
         if event.is_leaving(&self.user) {
             self.rooms.remove(&room.id);
         } else {
-            self.rooms.entry(room.id).or_default().push(event);
+            self.rooms
+                .entry(room.id)
+                .or_insert((room, Default::default()))
+                .1
+                .push(event);
+        }
+    }
+}
+
+pub mod fake {
+    use super::*;
+
+    pub fn db() -> Db {
+        let romain = user("Romain");
+        let john = user("John");
+        let mike = user("Mike");
+        let sarah = user("Sarah");
+        let room1 = room("Room 1");
+        let room2 = room("Room 2");
+        let room3 = room("Room 3");
+
+        let users = &[&romain, &john, &mike, &sarah];
+        let rooms = &[&room1, &room2, &room2];
+
+        let mut db = Db::new(romain.clone());
+
+        for user in users {
+            db.push(enter(user, None));
+            db.push(post(user, None, Some("Hello!")));
+
+            for room in rooms {
+                db.push(enter(user, Some(room)));
+                db.push(post(user, Some(room), Some("Hello!")));
+            }
+        }
+
+        db.push(post(&romain, None, None));
+        db.push(post(&sarah, None, None));
+
+        db
+    }
+
+    fn user(name: &str) -> User {
+        User {
+            id:   UserId::new(),
+            name: name.into(),
+        }
+    }
+
+    fn room(name: &str) -> Room {
+        Room {
+            id:   RoomId::new(),
+            name: name.into(),
+        }
+    }
+
+    fn message(body: Option<&str>) -> Message {
+        Message {
+            body: body.map(Into::into).unwrap_or_else(lorem),
+        }
+    }
+
+    fn lorem() -> String {
+        r#"Lorem ipsum dolor sit amet,
+consectetur adipiscing elit,
+sed do eiusmod tempor incididunt
+ut labore et dolore magna aliqua.
+Ut enim ad minim veniam, quis
+nostrud exercitation ullamco laboris
+nisi ut aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit
+in voluptate velit esse cillum dolore
+eu fugiat nulla pariatur. Excepteur
+sint occaecat cupidatat non proident,
+sunt in culpa qui officia deserunt
+mollit anim id est laborum."#
+            .into()
+    }
+
+    fn enter(user: &User, room: Option<&Room>) -> Event<User, Room> {
+        Event::new(channel(room), user.clone(), EventType::Enter)
+    }
+
+    fn leave(user: &User, room: Option<&Room>) -> Event<User, Room> {
+        Event::new(channel(room), user.clone(), EventType::Leave)
+    }
+
+    fn post(user: &User, room: Option<&Room>, msg: Option<&str>) -> Event<User, Room> {
+        Event::new(channel(room), user.clone(), EventType::Post {
+            message: message(msg),
+        })
+    }
+
+    fn channel<T: Clone>(room: Option<&T>) -> Channel<T> {
+        if let Some(room) = room {
+            Channel::Room(room.clone())
+        } else {
+            Channel::World
         }
     }
 }

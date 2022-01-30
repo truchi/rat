@@ -1,10 +1,10 @@
 mod config;
-mod views;
-mod widgets;
+// mod views;
+// mod widgets;
 
 pub use config::*;
-pub use views::*;
-pub use widgets::*;
+// pub use views::*;
+// pub use widgets::*;
 
 use super::*;
 use futures::future::ready;
@@ -106,19 +106,19 @@ impl From<(u16, u16, u16, u16)> for Rect {
 }
 
 pub trait View: Sized {
-    type Props: Default;
-    type State: Default;
+    // type Props: Default;
+    // type State: Default;
 
-    fn new(config: Config) -> Self;
-    fn set_props(&mut self, props: Self::Props);
-    fn render<W: Write>(&self, w: W);
+    // fn new(config: Config) -> Self;
+    // fn set_props(&mut self, props: Self::Props);
+    fn render<W: Write>(&self, w: W) {}
     // fn handle(&mut self, event: x::Event) -> Option<Flow>;
 
-    fn with_props(config: Config, props: Self::Props) -> Self {
-        let mut view = Self::new(config);
-        view.set_props(props);
-        view
-    }
+    // fn with_props(config: Config, props: Self::Props) -> Self {
+    // let mut view = Self::new(config);
+    // view.set_props(props);
+    // view
+    // }
 }
 
 trait WriteExt: Write + Sized {
@@ -140,7 +140,9 @@ pub async fn main() -> Option<()> {
     let mut out = out.lock();
     let config = Config::new();
 
-    let messages = vec![
+    let db = fake::db();
+
+    let messages: Vec<String> = vec![
         "Hello, world!".into(),
         "Hello, world!".into(),
         "Hello, world!".into(),
@@ -167,9 +169,9 @@ pub async fn main() -> Option<()> {
         .into(),
     ];
 
-    let channel_view_props = ChannelViewProps { messages };
-    let mut channel_view = ChannelView::with_props(config, channel_view_props);
-    out.render(&channel_view);
+    // let channel_view_props = ChannelViewProps { messages };
+    // let mut channel_view = ChannelView::with_props(config, channel_view_props);
+    // out.render(&channel_view);
 
     None
 }
