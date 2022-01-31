@@ -187,7 +187,9 @@ pub async fn main(mut connection: Connection) {
             }
             Some(event) = stream.next() => {
                 if event == control_c || event == esc {
-                    return connection.leave_world().await;
+                    connection.leave_world().await;
+                    connection.next().await;
+                    return;
                 }
 
                 state.handle(event)

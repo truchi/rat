@@ -85,7 +85,35 @@ impl Db {
         self.get(&user_id).is_some()
     }
 
-    pub fn is_in(&self, user_id: UserId, room_id: RoomId) -> Result<bool, ()> {
+    pub fn enter_world(&mut self, client_id: ClientId, user_id: UserId) -> Result<User, ()> {
+        let client = self.get(&client_id).ok_or(())?;
+        let user = client.user.clone().unwrap();
+
+        if user.id != user_id {
+            return Err(()); // Id mismatch
+        }
+
+        if self.get(&user.id).is_some() {
+            return Err(()); // Already in world
+        }
+
+        let _ = self.insert((user.id, user.clone()));
+        Ok(user)
+    }
+
+    pub fn leave_world(&mut self, user_id: UserId) -> Result<User, ()> {
+        if let Some(user) = self.remove(&user_id) {
+            for &room_id in user.room_ids() {
+                self.leave_room(user_id, room_id);
+            }
+
+            Ok(user)
+        } else {
+            Err(())
+        }
+    }
+
+    pub fn is_in_room(&self, user_id: UserId, room_id: RoomId) -> Result<bool, ()> {
         let user = self.get(&user_id).ok_or(())?;
         let room = self.get(&room_id).ok_or(())?;
 
@@ -97,35 +125,7 @@ impl Db {
         }
     }
 
-    pub fn enter_world(&mut self, client_id: ClientId, user_id: UserId) -> Result<(), ()> {
-        let client = self.get(&client_id).ok_or(())?;
-        let user = client.user.clone().unwrap();
-
-        if user.id != user_id {
-            return Err(());
-        }
-
-        if self.get(&user.id).is_some() {
-            return Err(()); // Already in world
-        }
-
-        let _ = self.insert((user.id, user));
-        Ok(())
-    }
-
-    pub fn leave_world(&mut self, user_id: UserId) -> Result<(), ()> {
-        if let Some(user) = self.remove(&user_id) {
-            for &room_id in user.room_ids() {
-                self.leave(user_id, room_id);
-            }
-
-            Ok(())
-        } else {
-            Err(())
-        }
-    }
-
-    pub fn enter(&mut self, user_id: UserId, room_id: RoomId) -> Result<(), ()> {
+    pub fn enter_room(&mut self, user_id: UserId, room_id: RoomId) -> Result<(), ()> {
         self.get(&room_id).ok_or(())?;
         self.get_mut(&user_id).ok_or(())?.enter(room_id);
         self.get_mut(&room_id).unwrap().enter(user_id);
@@ -133,7 +133,7 @@ impl Db {
         Ok(())
     }
 
-    pub fn leave(&mut self, user_id: UserId, room_id: RoomId) -> Result<(), ()> {
+    pub fn leave_room(&mut self, user_id: UserId, room_id: RoomId) -> Result<(), ()> {
         self.get(&room_id).ok_or(())?;
         self.get_mut(&user_id).ok_or(())?.leave(room_id);
         self.get_mut(&room_id).unwrap().leave(user_id);
@@ -222,13 +222,13 @@ macro_rules! impls {
             type Output = $V;
 
             fn index(&self, index: $K) -> &Self::Output {
-                self.get(&index).unwrap_or_else(|| panic!("{} {:?} not found", stringify!($Type), index))
+                self.get(&index).unwrap_or_else(|| panic!("{index:?} not found"))
             }
         }
 
         impl IndexMut<$K> for Db {
             fn index_mut(&mut self, index: $K) -> &mut Self::Output {
-                self.get_mut(&index).unwrap_or_else(|| panic!("{} {:?} not found", stringify!($Type), index))
+                self.get_mut(&index).unwrap_or_else(|| panic!("{index:?} not found"))
             }
         }
     )* };

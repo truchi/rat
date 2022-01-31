@@ -37,3 +37,65 @@ impl UserId {
         self.post(Channel::Room(room_id), message)
     }
 }
+
+impl<U, R> Event<U, R> {
+    pub fn enter(user: U, room: Option<R>) -> Self {
+        Event::new(
+            if let Some(room) = room {
+                Channel::Room(room)
+            } else {
+                Channel::World
+            },
+            user,
+            EventType::Enter,
+        )
+    }
+
+    pub fn leave(user: U, room: Option<R>) -> Self {
+        Event::new(
+            if let Some(room) = room {
+                Channel::Room(room)
+            } else {
+                Channel::World
+            },
+            user,
+            EventType::Leave,
+        )
+    }
+
+    pub fn post(user: U, room: Option<R>, message: Message) -> Self {
+        Event::new(
+            if let Some(room) = room {
+                Channel::Room(room)
+            } else {
+                Channel::World
+            },
+            user,
+            EventType::Post { message },
+        )
+    }
+
+    pub fn enter_world(user: U) -> Self {
+        Event::new(Channel::World, user, EventType::Enter)
+    }
+
+    pub fn leave_world(user: U) -> Self {
+        Event::new(Channel::World, user, EventType::Leave)
+    }
+
+    pub fn post_world(user: U, message: Message) -> Self {
+        Event::new(Channel::World, user, EventType::Post { message })
+    }
+
+    pub fn enter_room(user: U, room: R) -> Self {
+        Event::new(Channel::Room(room), user, EventType::Enter)
+    }
+
+    pub fn leave_room(user: U, room: R) -> Self {
+        Event::new(Channel::Room(room), user, EventType::Leave)
+    }
+
+    pub fn post_room(user: U, room: R, message: Message) -> Self {
+        Event::new(Channel::Room(room), user, EventType::Post { message })
+    }
+}

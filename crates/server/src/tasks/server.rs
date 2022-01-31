@@ -32,30 +32,23 @@ impl ServerTask {
                 C2S::Request(client_id, Request::Event(event)) =>
                     self.handle_event(client_id, event).await,
                 C2S::Request(client_id, Request::Shutdown) => self.handle_shutdown(client_id),
-                _ => {}
+                C2S::Request(client_id, _) => self.error(client_id).await,
             }
         }
     }
 
-    async fn broadcast(&mut self, event: Event<UserId, RoomId>) {
-        let user = self.db[event.user].clone().into();
-        let event = match event.channel {
-            Channel::World => Event {
-                channel: Channel::World,
-                user,
-                event_type: event.event_type,
-            },
-            Channel::Room(room_id) => Event {
-                channel: Channel::Room(self.db[room_id].clone().into()),
-                user,
-                event_type: event.event_type,
-            },
-        };
+    async fn error(&self, client_id: ClientId) {
+        self.db[client_id].respond(Response::Error).await;
+    }
 
-        let mut events = self
-            .db
-            .world()
-            .map(|client| client.respond(Response::Event(event.clone())))
+    async fn broadcast(
+        &self,
+        clients: impl IntoIterator<Item = &Client>,
+        event: Event<rat::User, rat::Room>,
+    ) {
+        let mut events = clients
+            .into_iter()
+            .map(|client| client.event(event.clone()))
             .collect::<FuturesUnordered<_>>();
 
         while events.next().await.is_some() {}
@@ -115,43 +108,69 @@ impl ServerTask {
         let user_id = event.user;
 
         match event.channel {
-            Channel::World => match event.event_type {
-                EventType::Enter =>
-                    if self.db.enter_world(client_id, user_id).is_err() {
-                        self.db[client_id].respond(Response::Error).await;
-                        return;
-                    },
-                EventType::Leave =>
-                    if self.db.leave_world(user_id).is_err() {
-                        self.db[client_id].respond(Response::Error).await;
-                        return;
-                    },
-                _ =>
-                    if !self.db.is_in_world(user_id) {
-                        self.db[client_id].respond(Response::Error).await;
-                        return;
-                    },
-            },
-            Channel::Room(room_id) => match event.event_type {
-                EventType::Enter =>
-                    if self.db.enter(user_id, room_id).is_err() {
-                        self.db[client_id].respond(Response::Error).await;
-                        return;
-                    },
-                EventType::Leave =>
-                    if self.db.leave(user_id, room_id).is_err() {
-                        self.db[client_id].respond(Response::Error).await;
-                        return;
-                    },
-                _ =>
-                    if self.db.is_in(user_id, room_id) != Ok(true) {
-                        self.db[client_id].respond(Response::Error).await;
-                        return;
-                    },
-            },
-        }
+            Channel::World => {
+                let event = match event.event_type {
+                    EventType::Enter =>
+                        if self.db.enter_world(client_id, user_id).is_ok() {
+                            Event::enter_world(self.db[user_id].clone().into())
+                        } else {
+                            return self.error(client_id).await;
+                        },
+                    EventType::Leave =>
+                        if let Ok(user) = self.db.leave_world(user_id) {
+                            let event = Event::leave_world(user.into());
+                            self.db[client_id].event(event.clone()).await;
+                            event
+                        } else {
+                            return self.error(client_id).await;
+                        },
+                    EventType::Post { message } =>
+                        if self.db.is_in_world(user_id) {
+                            Event::post_world(self.db[user_id].clone().into(), message)
+                        } else {
+                            return self.error(client_id).await;
+                        },
+                };
 
-        self.broadcast(event).await
+                self.broadcast(self.db.world(), event).await;
+            }
+            Channel::Room(room_id) => {
+                let event = match event.event_type {
+                    EventType::Enter =>
+                        if self.db.enter_room(user_id, room_id).is_ok() {
+                            Event::enter_room(
+                                self.db[user_id].clone().into(),
+                                self.db[room_id].clone().into(),
+                            )
+                        } else {
+                            return self.error(client_id).await;
+                        },
+                    EventType::Leave =>
+                        if self.db.leave_room(user_id, room_id).is_ok() {
+                            let event = Event::leave_room(
+                                self.db[user_id].clone().into(),
+                                self.db[room_id].clone().into(),
+                            );
+                            self.db[client_id].event(event.clone()).await;
+                            event
+                        } else {
+                            return self.error(client_id).await;
+                        },
+                    EventType::Post { message } =>
+                        if self.db.is_in_room(user_id, room_id) == Ok(true) {
+                            Event::post_room(
+                                self.db[user_id].clone().into(),
+                                self.db[room_id].clone().into(),
+                                message,
+                            )
+                        } else {
+                            return self.error(client_id).await;
+                        },
+                };
+
+                self.broadcast(self.db.room(room_id), event).await;
+            }
+        }
     }
 
     fn handle_shutdown(&mut self, client_id: ClientId) {

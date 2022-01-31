@@ -33,6 +33,10 @@ impl Client {
         self.send(S2C::Response(response)).await
     }
 
+    pub async fn event(&self, event: Event<rat::User, rat::Room>) -> Result<(), ()> {
+        self.respond(Response::Event(event)).await
+    }
+
     pub async fn connected(&self) -> Result<(), ()> {
         self.respond(Response::Connected(self.user.clone().unwrap().into()))
             .await
