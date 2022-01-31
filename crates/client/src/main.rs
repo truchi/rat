@@ -18,9 +18,10 @@ async fn main() {
     // let addr = "127.0.0.1:34254";
     // let client = Client::connect(addr.into()).await;
 
-    // ui::enter();
+    ui::enter();
     let _ = ui::main().await;
-    // ui::leave();
+    std::thread::sleep(std::time::Duration::from_secs(4));
+    ui::leave();
 }
 
 async fn prompt() -> String {

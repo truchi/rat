@@ -30,7 +30,11 @@ mod x {
     pub use crossterm::event::MouseEventKind;
     pub use crossterm::execute;
     pub use crossterm::queue;
+    pub use crossterm::style::Attribute;
     pub use crossterm::style::Color;
+    pub use crossterm::style::SetAttribute;
+    pub use crossterm::style::SetForegroundColor;
+    pub use crossterm::style::Stylize;
     pub use crossterm::terminal::disable_raw_mode;
     pub use crossterm::terminal::enable_raw_mode;
     pub use crossterm::terminal::size;
@@ -82,6 +86,14 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub fn shrink_center(mut self, i: u16) -> Rect {
+        self.x += i;
+        self.y += i;
+        self.w -= 2 * i;
+        self.h -= 2 * i;
+        self
+    }
+
     pub fn up(&self, rows: u16) -> Self {
         let mut rect = *self;
         rect.x -= rows;
@@ -126,6 +138,10 @@ trait WriteExt: Write + Sized {
         x::queue!(self, x::Clear(x::ClearType::All));
     }
 
+    fn move_to(&mut self, x: u16, y: u16) {
+        x::queue!(self, x::MoveTo(x, y));
+    }
+
     fn render<V: View>(mut self: &mut Self, view: &V) {
         self.clear();
         view.render(&mut self);
@@ -138,42 +154,177 @@ impl<W: Write> WriteExt for W {}
 pub async fn main() -> Option<()> {
     let out = stdout();
     let mut out = out.lock();
+
     let config = Config::new();
-
     let db = fake::db();
+    let state = State {
+        config,
+        db,
+        input: "lol".into(),
+    };
 
-    let messages: Vec<String> = vec![
-        "Hello, world!".into(),
-        "Hello, world!".into(),
-        "Hello, world!".into(),
-        "Hello, world!".into(),
-        "Hello, world!".into(),
-        "Hello, world!".into(),
-        "Hello, world!".into(),
-        "Hello, world!".into(),
-        r#"""
-        Lorem ipsum dolor sit amet,
-        consectetur adipiscing elit,
-        sed do eiusmod tempor incididunt
-        ut labore et dolore magna aliqua.
-        Ut enim ad minim veniam, quis
-        nostrud exercitation ullamco laboris
-        nisi ut aliquip ex ea commodo consequat.
-        Duis aute irure dolor in reprehenderit
-        in voluptate velit esse cillum dolore
-        eu fugiat nulla pariatur. Excepteur
-        sint occaecat cupidatat non proident,
-        sunt in culpa qui officia deserunt
-        mollit anim id est laborum.
-        """#
-        .into(),
-    ];
-
-    // let channel_view_props = ChannelViewProps { messages };
-    // let mut channel_view = ChannelView::with_props(config, channel_view_props);
-    // out.render(&channel_view);
+    state.render(&mut out);
+    out.flush();
 
     None
+}
+
+#[derive(Debug)]
+pub struct State {
+    config: Config,
+    db:     Db,
+    input:  String,
+}
+
+impl State {
+    pub fn render<W: Write>(&self, mut w: W) {
+        let width = self.config.width;
+        let height = self.config.height;
+        let input_h = 3;
+        let right_x = 0;
+        let right_w = width - right_x;
+
+        let right_rect: Rect = (right_x, 0, right_w, height).into();
+        let input_rect: Rect = (right_x, height - input_h, right_w, input_h).into();
+        let events_rect: Rect = (right_x, 0, right_w, right_rect.h - input_h).into();
+
+        self.render_input(&mut w, input_rect);
+        self.render_events(&mut w, events_rect);
+    }
+
+    pub fn render_events<W: Write>(&self, mut w: W, rect: Rect) {
+        self.render_borders(&mut w, rect);
+        let rect = rect.shrink_center(1);
+
+        let scrollbar_rect: Rect = (rect.x + rect.w - 1, rect.y, 1, rect.h).into();
+        let rect: Rect = (rect.x, rect.y, rect.w - 2, rect.h).into();
+
+        let events = self.db.world().iter();
+        let lines = events
+            .map(|event| fmt_channel_event(event, rect.w, self.config))
+            .flatten()
+            .rev()
+            .collect::<Vec<_>>();
+
+        for (i, line) in lines.iter().take(rect.h as usize).enumerate() {
+            w.move_to(rect.x, rect.y + rect.h - (i as u16 + 1));
+            write!(w, "{line}");
+        }
+
+        let t = lines.len();
+        let h = rect.h as usize;
+        if let Some(y) = t.checked_sub(h) {
+            self.render_scrollbar(&mut w, scrollbar_rect, y, h, t);
+        }
+    }
+
+    pub fn render_input<W: Write>(&self, mut w: W, rect: Rect) {
+        self.render_borders(&mut w, rect);
+        let rect = rect.shrink_center(1);
+        let green = x::SetForegroundColor(self.config.colors.green);
+        let yellow = x::SetForegroundColor(self.config.colors.yellow);
+        let bold = x::SetAttribute(x::Attribute::Bold);
+        let reset = x::SetAttribute(x::Attribute::Reset);
+        let input = &self.input;
+
+        w.move_to(rect.x, rect.y);
+        write!(&mut w, "{green}{bold}>{reset} {yellow}{input}{reset}");
+    }
+
+    pub fn render_borders<W: Write>(&self, mut w: W, rect: Rect) {
+        use x::Stylize;
+
+        let color = self.config.colors.purple;
+        let v = '│'.with(color);
+        let h = '─'.with(color);
+        let tl = '╭'.with(color);
+        let tr = '╮'.with(color);
+        let bl = '╰'.with(color);
+        let br = '╯'.with(color);
+
+        debug_assert!(rect.w > 1);
+        debug_assert!(rect.h > 1);
+
+        let render_h = |w: &mut W, y: u16, left, right| {
+            write!(w, "{}{left}", x::MoveTo(rect.x, y));
+            for _ in 2..rect.w {
+                write!(w, "{h}");
+            }
+            write!(w, "{right}");
+        };
+        let render_v = |w: &mut W, y: u16| {
+            let left = x::MoveTo(rect.x, y);
+            let right = x::MoveTo(rect.x + rect.w, y);
+            write!(w, "{left}{v}{right}{v}");
+        };
+
+        render_h(&mut w, rect.y, tl, tr);
+        (2..rect.h).for_each(|i| render_v(&mut w, rect.y + i - 1));
+        render_h(&mut w, rect.y + rect.h - 1, bl, br);
+    }
+
+    pub fn render_scrollbar<W: Write>(&self, mut w: W, rect: Rect, y: usize, h: usize, t: usize) {
+        use x::Stylize;
+
+        const INACTIVE: char = '│';
+        const ACTIVE: char = '┃';
+
+        let inactive = INACTIVE.with(self.config.colors.purple);
+        let active = ACTIVE.with(self.config.colors.pink);
+
+        let h = (h as f32 * rect.h as f32 / t as f32).round() as u16;
+        let y = (y as f32 * rect.h as f32 / t as f32).round() as u16;
+        let y0 = rect.y;
+        let y1 = rect.y + y;
+        let y2 = rect.y + y + h;
+        let y3 = rect.y + rect.h;
+
+        for (range, char) in [
+            ((y0..y1), inactive),
+            ((y1..y2), active),
+            ((y2..y3), inactive),
+        ] {
+            for i in range {
+                w.move_to(rect.x, i);
+                write!(&mut w, "{char}");
+            }
+        }
+    }
+}
+
+fn fmt_channel_event(event: &ChannelEvent, width: u16, config: Config) -> Vec<String> {
+    let bold = x::SetAttribute(x::Attribute::Bold);
+    let no_bold = x::SetAttribute(x::Attribute::NoBold);
+    let italic = x::SetAttribute(x::Attribute::Italic);
+    let reset = x::SetAttribute(x::Attribute::Reset);
+    let fg = |color| x::SetForegroundColor(color);
+    let yellow = fg(config.colors.yellow);
+    let purple = fg(config.colors.purple);
+    let pink = fg(config.colors.pink);
+
+    let fmt_event =
+        |name, event| format!("{italic}{purple}**{bold}{name}{no_bold} {event}**{reset}");
+    let fmt_message =
+        |name, message| format!("{pink}{bold}[{name}]{reset} {yellow}{message}{reset}");
+    let fmt_lines = |(i, str): (_, std::borrow::Cow<str>)| {
+        if i == 0 {
+            str.into_owned()
+        } else {
+            format!("{yellow}{str}{reset}")
+        }
+    };
+
+    let fmt = match event {
+        ChannelEvent::Enter { user } => fmt_event(&user.name, "entered"),
+        ChannelEvent::Leave { user } => fmt_event(&user.name, "left"),
+        ChannelEvent::Post { user, message } => fmt_message(&user.name, &message.body),
+    };
+
+    textwrap::wrap(&fmt, width as usize)
+        .into_iter()
+        .enumerate()
+        .map(fmt_lines)
+        .collect()
 }
 
 /*

@@ -119,6 +119,7 @@ pub mod fake {
         for user in users {
             db.push(enter(user, None));
             db.push(post(user, None, Some("Hello!")));
+            db.push(post(user, None, None));
 
             for room in rooms {
                 db.push(enter(user, Some(room)));
@@ -126,8 +127,12 @@ pub mod fake {
             }
         }
 
-        db.push(post(&romain, None, None));
-        db.push(post(&sarah, None, None));
+        for _ in 0..0 {
+            db.push(post(&romain, None, None));
+            db.push(post(&sarah, None, None));
+            db.push(post(&john, None, None));
+            db.push(post(&mike, None, None));
+        }
 
         db
     }
@@ -153,20 +158,7 @@ pub mod fake {
     }
 
     fn lorem() -> String {
-        r#"Lorem ipsum dolor sit amet,
-consectetur adipiscing elit,
-sed do eiusmod tempor incididunt
-ut labore et dolore magna aliqua.
-Ut enim ad minim veniam, quis
-nostrud exercitation ullamco laboris
-nisi ut aliquip ex ea commodo consequat.
-Duis aute irure dolor in reprehenderit
-in voluptate velit esse cillum dolore
-eu fugiat nulla pariatur. Excepteur
-sint occaecat cupidatat non proident,
-sunt in culpa qui officia deserunt
-mollit anim id est laborum."#
-            .into()
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.".into()
     }
 
     fn enter(user: &User, room: Option<&Room>) -> Event<User, Room> {
