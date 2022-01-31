@@ -67,6 +67,18 @@ impl Connection {
             .await;
     }
 
+    pub async fn leave_world(&mut self) {
+        self.send(Request::Event(self.user().id.leave_world()))
+            .await;
+    }
+
+    pub async fn post_world(&mut self, message: String) {
+        self.send(Request::Event(
+            self.user().id.post_world(Message { body: message }),
+        ))
+        .await;
+    }
+
     async fn send(&mut self, request: Request) {
         self.client
             .stream

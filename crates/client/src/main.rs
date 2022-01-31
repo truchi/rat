@@ -15,12 +15,20 @@ use tokio::net::TcpStream;
 
 #[tokio::main]
 async fn main() {
-    // let addr = "127.0.0.1:34254";
-    // let client = Client::connect(addr.into()).await;
+    let name = if let Some(name) = std::env::args().skip(1).next() {
+        name
+    } else {
+        println!("Your name as first argument!");
+        return;
+    };
+
+    let addr = "127.0.0.1:34254";
+    let client = Client::connect(addr.into()).await;
+    let mut connection = client.connect_user(name).await;
+    connection.enter_world().await;
 
     ui::enter();
-    let _ = ui::main().await;
-    std::thread::sleep(std::time::Duration::from_secs(4));
+    ui::main(connection).await;
     ui::leave();
 }
 

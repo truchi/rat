@@ -13,6 +13,7 @@ use futures::StreamExt;
 use std::io::stdout;
 use std::io::StdoutLock;
 use std::io::Write;
+use tokio::select;
 
 mod x {
     pub use crossterm::cursor::position;
@@ -151,22 +152,63 @@ trait WriteExt: Write + Sized {
 
 impl<W: Write> WriteExt for W {}
 
-pub async fn main() -> Option<()> {
+pub async fn main(mut connection: Connection) {
     let out = stdout();
     let mut out = out.lock();
-
     let config = Config::new();
-    let db = fake::db();
-    let state = State {
+
+    let db = connection.db().clone();
+    let mut state = State {
         config,
         db,
-        input: "lol".into(),
+        input: "".into(),
     };
+
+    let esc = x::Event::Key(x::KeyEvent {
+        code:      x::KeyCode::Esc,
+        modifiers: x::KeyModifiers::NONE,
+    });
+    let control_c = x::Event::Key(x::KeyEvent {
+        code:      x::KeyCode::Char('c'),
+        modifiers: x::KeyModifiers::CONTROL,
+    });
+
+    let stream = x::EventStream::new();
+    let mut stream = Box::pin(stream.filter_map(|event| async move { event.ok() }));
 
     state.render(&mut out);
     out.flush();
 
-    None
+    loop {
+        let flow = select! {
+            () = connection.next() => {
+                state.set_db(connection.db());
+                Some(Flow::Redraw)
+            }
+            Some(event) = stream.next() => {
+                if event == control_c || event == esc {
+                    return connection.leave_world().await;
+                }
+
+                state.handle(event)
+            }
+            else => break,
+        };
+
+        match flow {
+            Some(Flow::Redraw) => {
+                out.clear();
+                state.render(&mut out);
+                out.flush();
+            }
+            Some(Flow::Submit) =>
+                if !state.input.is_empty() {
+                    let message = std::mem::take(&mut state.input);
+                    connection.post_world(message).await;
+                },
+            None => {}
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -177,6 +219,30 @@ pub struct State {
 }
 
 impl State {
+    pub fn set_db(&mut self, db: &Db) {
+        self.db = db.clone();
+    }
+
+    pub fn handle(&mut self, event: x::Event) -> Option<Flow> {
+        match event {
+            x::Event::Key(x::KeyEvent { code, modifiers }) => match code {
+                x::KeyCode::Char(c) => {
+                    self.input.push(c);
+                    return Some(Flow::Redraw);
+                }
+                x::KeyCode::Backspace => {
+                    self.input.pop();
+                    return Some(Flow::Redraw);
+                }
+                x::KeyCode::Enter => return Some(Flow::Submit),
+                _ => {}
+            },
+            _ => {}
+        }
+
+        None
+    }
+
     pub fn render<W: Write>(&self, mut w: W) {
         let width = self.config.width;
         let height = self.config.height;
